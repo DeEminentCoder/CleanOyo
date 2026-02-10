@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Waste Up (Clean Oyo Scheduler)",
+  "description": "A comprehensive waste management and scheduling platform for Ibadan, Oyo State, connecting residents with PSP operators to eliminate illegal dumping and mitigate flooding.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
