@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { User, PickupRequest, WasteType, PickupStatus } from '../types';
 import { STATUS_COLORS, WASTE_ICONS } from '../constants';
 import { getWasteManagementTips } from '../services/geminiService';
+import { WasteScanner } from './WasteScanner';
 
 interface ResidentDashboardProps {
   user: User;
@@ -12,6 +13,7 @@ interface ResidentDashboardProps {
 
 export const ResidentDashboard: React.FC<ResidentDashboardProps> = ({ user, requests, onAddRequest }) => {
   const [showForm, setShowForm] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [wasteType, setWasteType] = useState<WasteType>(WasteType.GENERAL);
   const [date, setDate] = useState('');
   const [aiTip, setAiTip] = useState<string>('Generating clean city insights...');
@@ -45,29 +47,42 @@ export const ResidentDashboard: React.FC<ResidentDashboardProps> = ({ user, requ
 
   return (
     <div className="space-y-6">
-      {/* AI Tip Section */}
-      <div className="bg-emerald-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden group">
-        <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
-          <div className={`text-5xl transition-transform ${isTipLoading ? 'animate-pulse scale-110' : 'group-hover:scale-110'}`}>
-            {isTipLoading ? '✨' : '🤖'}
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-emerald-400 font-semibold">AI Waste Insight</h3>
-              <button 
-                onClick={() => fetchTip(wasteType)} 
-                className="text-[10px] bg-emerald-800 hover:bg-emerald-700 px-2 py-1 rounded-md transition-colors"
-                disabled={isTipLoading}
-              >
-                {isTipLoading ? 'Processing...' : 'Refresh Tip'}
-              </button>
+      {/* AI Tip & Scanner Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-emerald-900 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden group">
+          <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
+            <div className={`text-5xl transition-transform ${isTipLoading ? 'animate-pulse scale-110' : 'group-hover:scale-110'}`}>
+              {isTipLoading ? '✨' : '🤖'}
             </div>
-            <p className={`text-emerald-50 leading-relaxed italic transition-opacity ${isTipLoading ? 'opacity-50' : 'opacity-100'}`}>
-              "{aiTip}"
-            </p>
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-emerald-400 font-semibold">AI Waste Insight</h3>
+                <button 
+                  onClick={() => fetchTip(wasteType)} 
+                  className="text-[10px] bg-emerald-800 hover:bg-emerald-700 px-2 py-1 rounded-md transition-colors"
+                  disabled={isTipLoading}
+                >
+                  {isTipLoading ? 'Processing...' : 'Refresh Tip'}
+                </button>
+              </div>
+              <p className={`text-emerald-50 leading-relaxed italic transition-opacity ${isTipLoading ? 'opacity-50' : 'opacity-100'}`}>
+                "{aiTip}"
+              </p>
+            </div>
           </div>
+          <div className="absolute top-0 right-0 p-4 opacity-10 text-8xl">🌱</div>
         </div>
-        <div className="absolute top-0 right-0 p-4 opacity-10 text-8xl">🌱</div>
+
+        <button 
+          onClick={() => setShowScanner(true)}
+          className="bg-white p-6 rounded-3xl border-2 border-emerald-100 shadow-sm hover:shadow-md hover:border-emerald-500 transition-all group flex flex-col items-center justify-center text-center"
+        >
+          <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-2xl mb-3 group-hover:scale-110 transition-transform">
+            📸
+          </div>
+          <h4 className="font-bold text-slate-800">Scan Waste with AI</h4>
+          <p className="text-xs text-slate-500 mt-1">Unsure how to dispose? Take a photo!</p>
+        </button>
       </div>
 
       <div className="flex items-center justify-between">
@@ -143,6 +158,8 @@ export const ResidentDashboard: React.FC<ResidentDashboardProps> = ({ user, requ
           </div>
         )}
       </div>
+
+      {showScanner && <WasteScanner onClose={() => setShowScanner(false)} />}
     </div>
   );
 };

@@ -10,7 +10,10 @@ import {
 } from '../types';
 import { notificationService } from './notificationService';
 
-// Mock "MongoDB" Collections in LocalStorage
+// Backend Configuration
+const API_URL = 'http://localhost:5000/api'; 
+const USE_MOCK = true; 
+
 const STORAGE_KEYS = {
   USERS: 'waste_up_db_users',
   REQUESTS: 'waste_up_db_requests',
@@ -21,6 +24,15 @@ const STORAGE_KEYS = {
 const SYSTEM_CONTACT = "simeonkenny66@gmail.com";
 
 class ApiService {
+  private getHeaders() {
+    const token = localStorage.getItem('waste_up_auth_token');
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+  }
+
+  // --- Mock Helpers ---
   private getData<T>(key: string): T[] {
     const data = localStorage.getItem(key);
     return data ? JSON.parse(data) : [];
@@ -30,49 +42,26 @@ class ApiService {
     localStorage.setItem(key, JSON.stringify(data));
   }
 
-  // --- User Management ---
-  saveUser(user: User) {
-    const users = this.getData<User>(STORAGE_KEYS.USERS);
-    const existingIndex = users.findIndex(u => u.email === user.email);
-    if (existingIndex > -1) {
-      users[existingIndex] = user;
-    } else {
-      users.push(user);
+  // --- API Methods ---
+
+  async getUsers(): Promise<User[]> {
+    if (!USE_MOCK) {
+       try {
+         const response = await fetch(`${API_URL}/users`, { headers: this.getHeaders() });
+         if (response.ok) return await response.json();
+       } catch (e) { console.warn('API Unavailable'); }
     }
-    this.setData(STORAGE_KEYS.USERS, users);
-    
-    // If it's a PSP operator, sync with the operators collection for assignment logic
-    if (user.role === UserRole.PSP_OPERATOR) {
-      const operators = this.getData<PSPOperatorProfile>(STORAGE_KEYS.OPERATORS);
-      const opIndex = operators.findIndex(op => op.userId === user.id);
-      if (opIndex > -1) {
-        operators[opIndex].availability = user.availability ?? true;
-        operators[opIndex].serviceZone = user.location;
-        this.setData(STORAGE_KEYS.OPERATORS, operators);
-      }
-    }
+    return this.getData<User>(STORAGE_KEYS.USERS);
   }
 
-  getUserByEmail(email: string): User | undefined {
-    const users = this.getData<User>(STORAGE_KEYS.USERS);
-    return users.find(u => u.email.toLowerCase() === email.toLowerCase());
-  }
-
-  // --- Activity Logging ---
-  private async logActivity(userId: string, action: string, details: string) {
-    const logs = this.getData<ActivityLog>(STORAGE_KEYS.LOGS);
-    const newLog: ActivityLog = {
-      id: `log-${Date.now()}`,
-      userId,
-      action,
-      details,
-      timestamp: new Date().toISOString()
-    };
-    this.setData(STORAGE_KEYS.LOGS, [newLog, ...logs]);
-  }
-
-  // --- Pickup Requests (Mongoose-like) ---
   async getRequests(userId?: string, role?: UserRole): Promise<PickupRequest[]> {
+    if (!USE_MOCK) {
+      try {
+        const response = await fetch(`${API_URL}/pickuprequests`, { headers: this.getHeaders() });
+        if (response.ok) return await response.json();
+      } catch (e) { console.warn('API Unavailable, using fallback storage'); }
+    }
+
     const all = this.getData<PickupRequest>(STORAGE_KEYS.REQUESTS);
     if (!userId || role === UserRole.ADMIN) return all;
     if (role === UserRole.RESIDENT) return all.filter(r => r.residentId === userId);
@@ -80,15 +69,28 @@ class ApiService {
     return [];
   }
 
+  async getActivityLogs(): Promise<ActivityLog[]> {
+    if (!USE_MOCK) {
+       try {
+         const response = await fetch(`${API_URL}/activitylogs`, { headers: this.getHeaders() });
+         if (response.ok) return await response.json();
+       } catch (e) { console.warn('API Unavailable'); }
+    }
+    return this.getData<ActivityLog>(STORAGE_KEYS.LOGS);
+  }
+
+  async getUserActivityLogs(userId: string): Promise<ActivityLog[]> {
+    const allLogs = await this.getActivityLogs();
+    return allLogs.filter(log => log.userId === userId);
+  }
+
   async createRequest(resident: User, data: Partial<PickupRequest>): Promise<PickupRequest> {
     const requests = this.getData<PickupRequest>(STORAGE_KEYS.REQUESTS);
-    
-    // Improved assignment logic: check for both the profile and the current user's availability status
     const allUsers = this.getData<User>(STORAGE_KEYS.USERS);
     const availableOpUser = allUsers.find(u => 
       u.role === UserRole.PSP_OPERATOR && 
       u.location === resident.location && 
-      (u.availability !== false) // default to true if undefined
+      (u.availability !== false)
     );
 
     const newRequest: PickupRequest = {
@@ -106,10 +108,8 @@ class ApiService {
       notes: data.notes
     };
 
-    const updated = [newRequest, ...requests];
-    this.setData(STORAGE_KEYS.REQUESTS, updated);
-
-    await this.logActivity(resident.id, 'CREATE_PICKUP', `New ${newRequest.wasteType} request created.`);
+    this.setData(STORAGE_KEYS.REQUESTS, [newRequest, ...requests]);
+    await this.logActivity(resident.id, 'CREATE_PICKUP', `New ${newRequest.wasteType} request created for ${newRequest.location}.`);
     
     notificationService.sendEmail('PASSWORD_RESET' as any, resident.email, {
       subject: "Pickup Scheduled",
@@ -125,26 +125,53 @@ class ApiService {
     const index = requests.findIndex(r => r.id === requestId);
     if (index === -1) return;
 
+    const oldStatus = requests[index].status;
     requests[index].status = status;
     requests[index].updatedAt = new Date().toISOString();
     this.setData(STORAGE_KEYS.REQUESTS, requests);
 
-    await this.logActivity(userId, 'UPDATE_STATUS', `Request ${requestId} status changed to ${status}`);
+    await this.logActivity(userId, 'UPDATE_STATUS', `Request ID #${requestId.slice(-6)} status updated from ${oldStatus} to ${status}`);
     notificationService.sendSms('STATUS_UPDATE', '08000000000', { status });
+  }
+
+  saveUser(user: User) {
+    const users = this.getData<User>(STORAGE_KEYS.USERS);
+    const existingIndex = users.findIndex(u => u.email === user.email);
+    if (existingIndex > -1) {
+      users[existingIndex] = user;
+    } else {
+      users.push(user);
+    }
+    this.setData(STORAGE_KEYS.USERS, users);
+    this.logActivity(user.id, 'UPDATE_PROFILE' as any, `User ${user.name} details updated.`);
+  }
+
+  getUserByEmail(email: string): User | undefined {
+    const users = this.getData<User>(STORAGE_KEYS.USERS);
+    return users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  }
+
+  async logActivity(userId: string, action: string, details: string) {
+    const logs = this.getData<ActivityLog>(STORAGE_KEYS.LOGS);
+    const newLog: ActivityLog = {
+      id: `log-${Date.now()}`,
+      userId,
+      action,
+      details,
+      timestamp: new Date().toISOString()
+    };
+    this.setData(STORAGE_KEYS.LOGS, [newLog, ...logs]);
   }
 
   seedDatabase() {
     if (this.getData(STORAGE_KEYS.USERS).length === 0) {
       const users: User[] = [
-        { id: 'admin-1', name: 'Admin User', email: SYSTEM_CONTACT, phone: '08000000001', role: UserRole.ADMIN, location: 'Dugbe' },
-        { id: 'psp-1', name: 'CleanOyo Ltd', email: 'ops@cleanoyo.ng', phone: '08023456789', role: UserRole.PSP_OPERATOR, location: 'Bodija', availability: true },
-        { id: 'res-1', name: 'Ayo Balogun', email: 'ayo@mail.ng', phone: '08012345678', role: UserRole.RESIDENT, location: 'Bodija' }
-      ];
-      const profiles: PSPOperatorProfile[] = [
-        { userId: 'psp-1', serviceZone: 'Bodija', availability: true, fleetSize: 10, efficiency: 95, assignedSubZones: ['Bodija Estate', 'Samonda'] }
+        { id: 'admin-1', name: 'Admin User', email: SYSTEM_CONTACT, phone: '08000000001', role: UserRole.ADMIN, location: 'Dugbe', password: 'password123' },
+        { id: 'psp-1', name: 'CleanOyo Ltd', email: 'ops@cleanoyo.ng', phone: '08023456789', role: UserRole.PSP_OPERATOR, location: 'Bodija', availability: true, password: 'password123' },
+        { id: 'res-1', name: 'Ayo Balogun', email: 'ayo@mail.ng', phone: '08012345678', role: UserRole.RESIDENT, location: 'Bodija', password: 'password123' }
       ];
       this.setData(STORAGE_KEYS.USERS, users);
-      this.setData(STORAGE_KEYS.OPERATORS, profiles);
+      this.logActivity('SYSTEM', 'DATABASE_SEED', 'System initial records successfully populated for Ibadan Pilot.');
     }
   }
 }

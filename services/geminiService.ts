@@ -1,10 +1,10 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { WasteType } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+// Fix: Use process.env.API_KEY directly and ensure named parameter initialization
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// Local Knowledge Base for Ibadan Waste Management (Fallback for API Quota/Offline)
+// Local Knowledge Base for Ibadan Waste Management
 const LOCAL_TIPS: Record<string, string[]> = {
   [WasteType.GENERAL]: [
     "Ensure your bin is tightly covered to prevent scavengers from scattering waste into gutters.",
@@ -33,11 +33,9 @@ const LOCAL_TIPS: Record<string, string[]> = {
   ]
 };
 
-// Simple cache to reduce API pressure
 const tipCache: Record<string, string> = {};
 
 export const getWasteManagementTips = async (wasteType: string) => {
-  // Check cache first
   if (tipCache[wasteType]) return tipCache[wasteType];
 
   try {
@@ -49,6 +47,7 @@ export const getWasteManagementTips = async (wasteType: string) => {
       },
     });
     
+    // Fix: Access response.text property directly
     const text = response.text?.trim();
     if (text) {
       tipCache[wasteType] = text;
@@ -56,17 +55,56 @@ export const getWasteManagementTips = async (wasteType: string) => {
     }
     throw new Error("Empty response");
   } catch (error: any) {
-    console.warn("Gemini API limited or unavailable, using local Ibadan Knowledge Base.", error);
-    
-    // Fallback to local tips based on type
     const fallbacks = LOCAL_TIPS[wasteType] || [
       "Keep Ibadan clean by disposing of waste only in designated PSP containers to prevent flash floods.",
       "Blocked drains cause flooding in Ibadan; ensure no waste enters the gutters near your home.",
       "Cooperate with your assigned PSP operator for a cleaner and safer Oyo State."
     ];
-    
-    const randomTip = fallbacks[Math.floor(Math.random() * fallbacks.length)];
-    return randomTip;
+    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+  }
+};
+
+export const analyzeWasteImage = async (base64Image: string) => {
+  try {
+    // Fix: Use contents: { parts: [...] } structure for sending images and text together
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: 'image/jpeg',
+              data: base64Image.split(',')[1] || base64Image,
+            },
+          },
+          {
+            text: `Identify the waste in this image. Provide:
+            1. Waste Category (General, Recyclable, Organic, Hazardous, Construction).
+            2. Specific disposal advice for a resident in Ibadan.
+            3. Environmental impact if dumped illegally in a gutter.
+            Return in JSON format.`,
+          },
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            category: { type: Type.STRING },
+            advice: { type: Type.STRING },
+            impact: { type: Type.STRING }
+          },
+          required: ["category", "advice", "impact"]
+        }
+      }
+    });
+
+    // Fix: Access text property directly
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("AI Analysis failed:", error);
+    throw error;
   }
 };
 
@@ -81,9 +119,9 @@ export const generateSmsContent = async (type: 'REMINDER' | 'STATUS_UPDATE' | 'C
       contents: prompt,
       config: { temperature: 0.5 }
     });
+    // Fix: Access text property directly
     return response.text?.trim() || `Waste Up Ibadan: Your ${data.wasteType || 'pickup'} status is now ${data.status}. Thank you!`;
   } catch (error) {
-    // Standard fallback SMS
     const status = data.status || 'updated';
     return `Waste Up Ibadan: Your pickup status has been ${status.toLowerCase()}. Thank you for helping us keep Oyo clean.`;
   }
@@ -98,6 +136,7 @@ export const generateEmailContent = async (type: 'PASSWORD_RESET', data: any) =>
       contents: prompt,
       config: { temperature: 0.6 }
     });
+    // Fix: Access text property directly
     return response.text || "Hello, please use the link in the app to reset your Waste Up Ibadan password.";
   } catch (error) {
     return `Hello ${data.name || 'Citizen'}, you requested a password reset for your Waste Up Ibadan account. Please visit the portal to continue.`;
@@ -105,7 +144,7 @@ export const generateEmailContent = async (type: 'PASSWORD_RESET', data: any) =>
 };
 
 export interface RouteOptimizationResult {
-  optimizedOrder: number[]; // Indices of the locations in the original array
+  optimizedOrder: number[];
   justification: string;
 }
 
@@ -136,7 +175,8 @@ export const getRouteOptimizationAdvice = async (locations: string[]): Promise<R
       }
     });
     
-    return JSON.parse(response.text);
+    // Fix: Access text property directly
+    return JSON.parse(response.text || '{}');
   } catch (error) {
     console.error("AI Route Optimization failed, using simple sequential fallback", error);
     return {

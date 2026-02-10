@@ -16,6 +16,7 @@ export const STATUS_COLORS = {
   [PickupStatus.ON_THE_WAY]: 'bg-yellow-100 text-yellow-800',
   [PickupStatus.COMPLETED]: 'bg-green-100 text-green-800',
   [PickupStatus.CANCELLED]: 'bg-red-100 text-red-800',
+  [PickupStatus.PENDING]: 'bg-slate-100 text-slate-800',
 };
 
 export const WASTE_ICONS = {
@@ -35,6 +36,7 @@ export const ROLE_MENU_ITEMS: Record<UserRole, MenuItem[]> = {
   [UserRole.RESIDENT]: [
     { icon: '📊', label: 'Dashboard' },
     { icon: '📅', label: 'My Schedule' },
+    { icon: '📜', label: 'History' },
     { icon: '🌿', label: 'Waste Tips' },
     { icon: '⚙️', label: 'Settings' },
   ],
@@ -47,9 +49,12 @@ export const ROLE_MENU_ITEMS: Record<UserRole, MenuItem[]> = {
   ],
   [UserRole.ADMIN]: [
     { icon: '📈', label: 'Overview' },
+    { icon: '🗂️', label: 'All Requests' },
+    { icon: '👥', label: 'User Management' },
     { icon: '🏢', label: 'PSP Managers' },
     { icon: '📍', label: 'Zones' },
     { icon: '⚠️', label: 'Flood Risk' },
+    { icon: '📜', label: 'System Logs' },
   ],
 };
 

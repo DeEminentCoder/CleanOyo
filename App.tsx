@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { UserRole, User, PickupRequest, PickupStatus, WasteType } from './types';
+import { UserRole, User, PickupRequest, PickupStatus, WasteType, ActivityLog } from './types';
 import { ResidentDashboard } from './components/ResidentDashboard';
 import { PSPOperatorDashboard } from './components/PSPOperatorDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -14,6 +14,7 @@ import { ROLE_MENU_ITEMS, ROLE_DEFAULT_TABS } from './constants';
 
 // Specialized components
 import { ResidentSchedule } from './components/ResidentSchedule';
+import { ResidentHistory } from './components/ResidentHistory';
 import { WasteTipsView } from './components/WasteTipsView';
 import { ProfileSettings } from './components/ProfileSettings';
 import { PickupsHistory } from './components/PickupsHistory';
@@ -22,13 +23,18 @@ import { OperatorStats } from './components/OperatorStats';
 import { PSPDirectory } from './components/PSPDirectory';
 import { ZoneStats } from './components/ZoneStats';
 import { FloodAnalysis } from './components/FloodAnalysis';
+import { MasterJobBoard } from './components/MasterJobBoard';
+import { SystemLogs } from './components/SystemLogs';
+import { UserManagement } from './components/UserManagement';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [activeTab, setActiveTab] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeNotification, setActiveNotification] = useState<Notification | null>(null);
   const [requests, setRequests] = useState<PickupRequest[]>([]);
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
 
   // Seed DB and Fetch Data
   useEffect(() => {
@@ -40,6 +46,10 @@ const App: React.FC = () => {
         setActiveTab(ROLE_DEFAULT_TABS[currentUser.role]);
         const data = await apiService.getRequests(currentUser.id, currentUser.role);
         setRequests(data);
+        if (currentUser.role === UserRole.ADMIN) {
+           const logData = await apiService.getActivityLogs();
+           setLogs(logData);
+        }
       }
       setIsInitializing(false);
     };
@@ -51,6 +61,10 @@ const App: React.FC = () => {
     if (user) {
       const data = await apiService.getRequests(user.id, user.role);
       setRequests(data);
+      if (user.role === UserRole.ADMIN) {
+         const logData = await apiService.getActivityLogs();
+         setLogs(logData);
+      }
     }
   };
 
@@ -58,39 +72,45 @@ const App: React.FC = () => {
   useEffect(() => {
     const unsubscribe = notificationService.subscribe((n) => {
       setActiveNotification(n);
+      refreshData(); // Refresh to show new request/log instantly
       setTimeout(() => setActiveNotification(null), 7000);
     });
     return unsubscribe;
-  }, []);
+  }, [user]);
 
-  const handleLogin = async (email: string, selectedRole: UserRole) => {
+  const handleLogin = async (email: string, selectedRole: UserRole, password?: string) => {
     try {
-      const { user: loggedInUser } = await authService.login(email, selectedRole);
+      const { user: loggedInUser } = await authService.login(email, selectedRole, password);
       setUser(loggedInUser);
       setActiveTab(ROLE_DEFAULT_TABS[selectedRole]);
-      const data = await apiService.getRequests(loggedInUser.id, loggedInUser.role);
-      setRequests(data);
-    } catch (error) {
-      alert("Login failed.");
+      await refreshData();
+    } catch (error: any) {
+      throw error;
     }
   };
 
-  const handleRegister = async (details: { name: string; email: string; phone: string; role: UserRole }) => {
+  const handleRegister = async (details: { name: string; email: string; phone: string; role: UserRole; location?: string; password?: string }) => {
     try {
       const { user: registeredUser } = await authService.register(details);
       setUser(registeredUser);
       setActiveTab(ROLE_DEFAULT_TABS[details.role]);
-      const data = await apiService.getRequests(registeredUser.id, registeredUser.role);
-      setRequests(data);
-    } catch (error) {
-      alert("Registration failed.");
+      await refreshData();
+    } catch (error: any) {
+      throw error;
+    }
+  };
+
+  const handleForgotPassword = async (email: string) => {
+    try {
+      await authService.requestPasswordReset(email);
+    } catch (error: any) {
+      throw error;
     }
   };
 
   const handleUpdateUser = (updatedUser: User) => {
     apiService.saveUser(updatedUser);
     setUser(updatedUser);
-    // Update the session token with new details
     authService.updateToken(updatedUser);
   };
 
@@ -99,6 +119,7 @@ const App: React.FC = () => {
     setUser(null);
     setActiveTab('');
     setRequests([]);
+    setIsSidebarOpen(false);
   };
 
   const addRequest = async (data: Partial<PickupRequest>) => {
@@ -121,6 +142,7 @@ const App: React.FC = () => {
       switch (tab) {
         case 'Dashboard': return <ResidentDashboard user={user} requests={requests} onAddRequest={addRequest} />;
         case 'My Schedule': return <ResidentSchedule requests={requests} />;
+        case 'History': return <ResidentHistory requests={requests} />;
         case 'Waste Tips': return <WasteTipsView />;
         case 'Settings': return <ProfileSettings user={user} onUpdateUser={handleUpdateUser} />;
         default: return <ResidentDashboard user={user} requests={requests} onAddRequest={addRequest} />;
@@ -141,9 +163,12 @@ const App: React.FC = () => {
     if (user.role === UserRole.ADMIN) {
       switch (tab) {
         case 'Overview': return <AdminDashboard requests={requests} />;
+        case 'All Requests': return <MasterJobBoard requests={requests} />;
+        case 'User Management': return <UserManagement />;
         case 'PSP Managers': return <PSPDirectory userRole={user.role} />;
         case 'Zones': return <ZoneStats requests={requests} />;
         case 'Flood Risk': return <FloodAnalysis />;
+        case 'System Logs': return <SystemLogs logs={logs} />;
         default: return <AdminDashboard requests={requests} />;
       }
     }
@@ -151,14 +176,28 @@ const App: React.FC = () => {
     return null;
   };
 
-  if (isInitializing) return <div className="min-h-screen flex items-center justify-center bg-emerald-50">Loading Portal...</div>;
-  if (!user) return <Login onLogin={handleLogin} onRegister={handleRegister} />;
+  if (isInitializing) return <div className="min-h-screen flex items-center justify-center bg-emerald-50 font-bold text-emerald-800 animate-pulse">Initializing Waste Up Ibadan Portal...</div>;
+  if (!user) return <Login onLogin={handleLogin} onRegister={handleRegister} onForgotPassword={handleForgotPassword} />;
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden relative">
-      <Sidebar user={user} activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout} />
+      <Sidebar 
+        user={user} 
+        activeTab={activeTab} 
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          setIsSidebarOpen(false);
+        }} 
+        onLogout={handleLogout}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+      />
       <div className="flex-1 flex flex-col min-w-0">
-        <Navbar user={user} currentTab={activeTab} />
+        <Navbar 
+          user={user} 
+          currentTab={activeTab} 
+          onMenuClick={() => setIsSidebarOpen(true)}
+        />
         <main className="flex-1 overflow-y-auto p-4 md:p-8">{renderContent()}</main>
       </div>
 
