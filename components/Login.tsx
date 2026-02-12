@@ -12,70 +12,46 @@ interface LoginProps {
 type AuthView = 'login' | 'register' | 'forgot';
 
 export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassword }) => {
+  const [view, setView] = useState<AuthView>('login');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isResetSent, setIsResetSent] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Form Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('Bodija');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isResetSent, setIsResetSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedRole, setSelectedRole] = useState<UserRole | null>(UserRole.RESIDENT);
-  const [registerRole, setRegisterRole] = useState<UserRole>(UserRole.RESIDENT);
-  const [view, setView] = useState<AuthView>('login');
-  const [showPassword, setShowPassword] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.RESIDENT);
 
   useEffect(() => {
     setError(null);
     setIsResetSent(false);
-  }, [view, selectedRole, registerRole]);
+  }, [view, selectedRole]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    if (!selectedRole) {
-      setError("Please choose your portal role to proceed.");
-      return;
-    }
-    if (!password) {
-      setError("Please enter your password.");
-      return;
-    }
+    if (!email || !password) return setError("Please enter your credentials.");
     setIsLoading(true);
     try {
       await onLogin(email, selectedRole, password);
     } catch (err: any) {
-      setError(err.message || "Login failed. Please check your credentials.");
+      setError(err.message || "Authentication failed.");
       setIsLoading(false);
     }
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    if (!name || !email || !phone || !password) {
-      setError("Please complete all required fields.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("Passwords do not match. Please verify your entries.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long.");
-      return;
-    }
+    if (password !== confirmPassword) return setError("Passwords do not match.");
+    if (password.length < 6) return setError("Password must be at least 6 characters.");
+    
     setIsLoading(true);
     try {
-      await onRegister({
-        name,
-        email,
-        phone,
-        role: registerRole,
-        location,
-        password
-      });
+      await onRegister({ name, email, phone, role: selectedRole, location, password });
     } catch (err: any) {
       setError(err.message || "Registration failed.");
       setIsLoading(false);
@@ -84,296 +60,185 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
 
   const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    if (!email) {
-      setError("Please enter your email address.");
-      return;
-    }
     setIsLoading(true);
     try {
       await onForgotPassword(email);
       setIsResetSent(true);
     } catch (err: any) {
-      setError(err.message || "Request failed. Check if the email is correct.");
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const renderError = () => {
-    if (!error) return null;
-    return (
-      <div className="bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded-r-xl text-xs font-semibold mb-6 flex items-start gap-3 animate-in fade-in slide-in-from-top-1">
-        <span className="shrink-0">⚠️</span>
-        <p>{error}</p>
-      </div>
-    );
-  };
-
-  const LoadingSpinner = () => (
-    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-  );
-
   return (
-    <div className="min-h-screen bg-emerald-50 flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-100 rounded-full blur-3xl opacity-50 -mr-48 -mt-48"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-200 rounded-full blur-3xl opacity-50 -ml-48 -mb-48"></div>
-      
-      <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl border border-white p-8 md:p-12 relative z-10">
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-600 rounded-3xl shadow-xl shadow-emerald-200 mb-6 text-4xl transform -rotate-6">
-            🌱
-          </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Waste Up</h1>
-          <p className="text-slate-400 font-medium text-sm">Clean Oyo Scheduler • Ibadan Pilot</p>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 transition-colors duration-300">
+      <div className="w-full max-w-[360px] bg-white dark:bg-slate-900 rounded-[1.5rem] shadow-2xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 animate-in zoom-in-95 duration-300">
+        
+        {/* Brand Header */}
+        <div className="text-center mb-6">
+          <div className="w-10 h-10 bg-emerald-600 rounded-xl shadow-lg shadow-emerald-200 dark:shadow-none mx-auto flex items-center justify-center text-xl mb-3">🌱</div>
+          <h1 className="text-lg font-bold text-slate-900 dark:text-white">Waste Up Ibadan</h1>
+          <p className="text-slate-400 text-[10px] mt-0.5 uppercase tracking-widest font-black">Clean Oyo Initiative</p>
         </div>
 
-        {view === 'login' ? (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="grid grid-cols-3 gap-2 p-1.5 bg-slate-100 rounded-2xl">
-              {[
-                { id: UserRole.RESIDENT, label: 'Resident' },
-                { id: UserRole.PSP_OPERATOR, label: 'Operator' },
-                { id: UserRole.ADMIN, label: 'Admin' }
-              ].map((r) => (
-                <button
-                  key={r.id}
-                  disabled={isLoading}
-                  onClick={() => setSelectedRole(r.id)}
-                  className={`py-2 text-[10px] font-black uppercase rounded-xl transition-all ${selectedRole === r.id ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {r.label}
-                </button>
-              ))}
+        {/* View Toggles */}
+        {view !== 'forgot' && (
+          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg mb-6">
+            <button 
+              onClick={() => setSelectedRole(UserRole.RESIDENT)} 
+              className={`py-1.5 text-[9px] font-black uppercase rounded-md transition-all ${selectedRole === UserRole.RESIDENT ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-400'}`}
+            >
+              Resident
+            </button>
+            <button 
+              onClick={() => setSelectedRole(UserRole.PSP_OPERATOR)} 
+              className={`py-1.5 text-[9px] font-black uppercase rounded-md transition-all ${selectedRole === UserRole.PSP_OPERATOR ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-400'}`}
+            >
+              Operator
+            </button>
+            <button 
+              onClick={() => setSelectedRole(UserRole.ADMIN)} 
+              className={`py-1.5 text-[9px] font-black uppercase rounded-md transition-all ${selectedRole === UserRole.ADMIN ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-400'}`}
+            >
+              Admin
+            </button>
+          </div>
+        )}
+
+        {error && (
+          <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-[10px] font-bold mb-4 border border-red-100 dark:border-red-900/30">
+            ⚠️ {error}
+          </div>
+        )}
+
+        {isResetSent && (
+          <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl text-[10px] font-bold mb-4 border border-emerald-100 dark:border-emerald-900/30">
+            ✅ Reset instructions sent to your email.
+          </div>
+        )}
+
+        {/* LOGIN VIEW */}
+        {view === 'login' && (
+          <form onSubmit={handleLoginSubmit} className="space-y-3">
+            <div>
+              <label className="block text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Email Address</label>
+              <input 
+                required 
+                type="email" 
+                value={email} 
+                onChange={e => setEmail(e.target.value)} 
+                className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none dark:text-white transition-all" 
+                placeholder="name@mail.com"
+              />
             </div>
-
-            {renderError()}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Email Address</label>
-                <input 
-                  required 
-                  disabled={isLoading}
-                  type="email" 
-                  placeholder="name@mail.ng" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-emerald-500 outline-none transition-all disabled:opacity-60" 
-                  value={email} 
-                  onChange={e => setEmail(e.target.value)} 
-                />
+            <div>
+              <div className="flex justify-between mb-1.5">
+                <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Password</label>
+                <button type="button" onClick={() => setView('forgot')} className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">Forgot?</button>
               </div>
               <div className="relative">
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Password</label>
-                  <button 
-                    type="button" 
-                    disabled={isLoading}
-                    onClick={() => setView('forgot')}
-                    className="text-[10px] font-bold text-emerald-600 hover:underline disabled:opacity-50"
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
                 <input 
                   required 
-                  disabled={isLoading}
                   type={showPassword ? "text" : "password"} 
-                  placeholder="••••••••" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-emerald-500 outline-none transition-all disabled:opacity-60" 
                   value={password} 
                   onChange={e => setPassword(e.target.value)} 
+                  className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none dark:text-white transition-all" 
+                  placeholder="••••••••"
                 />
                 <button 
                   type="button" 
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 bottom-4 text-slate-400 hover:text-emerald-600"
+                  className="absolute right-3 top-2 text-xs text-slate-400 hover:text-emerald-600"
                 >
                   {showPassword ? '🙈' : '👁️'}
                 </button>
               </div>
-              <button 
-                type="submit" 
-                disabled={isLoading}
-                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 disabled:bg-emerald-800 disabled:shadow-none"
-              >
-                {isLoading ? (
-                  <div className="flex items-center justify-center gap-3">
-                    <LoadingSpinner />
-                    <span>Verifying...</span>
-                  </div>
-                ) : (
-                  'Access Portal'
-                )}
-              </button>
-            </form>
-
-            <div className="text-center pt-4">
-              <p className="text-sm text-slate-500">
-                New to Waste Up? 
-                <button 
-                  disabled={isLoading}
-                  onClick={() => setView('register')} 
-                  className="text-emerald-600 font-bold ml-1 hover:underline disabled:opacity-50"
-                >
-                  Register Here
-                </button>
-              </p>
             </div>
-          </div>
-        ) : view === 'forgot' ? (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
             <button 
-              disabled={isLoading}
-              onClick={() => setView('login')} 
-              className="text-emerald-600 font-bold text-xs hover:underline flex items-center gap-1 disabled:opacity-50"
+              type="submit" 
+              disabled={isLoading} 
+              className="w-full bg-emerald-600 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 shadow-md shadow-emerald-200 dark:shadow-none disabled:opacity-50 transition-all active:scale-[0.98]"
             >
-              ← Back to Login
+              {isLoading ? 'VERIFYING...' : 'ENTER PORTAL'}
             </button>
-            <div className="mb-4">
-              <h3 className="text-2xl font-black text-slate-900">Reset Password</h3>
-              <p className="text-sm text-slate-400">Enter your email to receive a recovery link.</p>
-            </div>
-            {isResetSent ? (
-              <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center animate-in zoom-in-95">
-                <div className="text-4xl mb-4">📧</div>
-                <h4 className="font-bold text-emerald-800 mb-2">Recovery Sent!</h4>
-                <p className="text-xs text-emerald-600 leading-relaxed">
-                  We've sent a recovery link to <strong>{email}</strong>. Please check your inbox and spam folder.
-                </p>
-                <button onClick={() => setView('login')} className="mt-6 w-full bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors">
-                  Return to Login
-                </button>
-              </div>
-            ) : (
-              <>
-                {renderError()}
-                <form onSubmit={handleForgotSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Account Email</label>
-                    <input 
-                      required 
-                      disabled={isLoading}
-                      type="email" 
-                      placeholder="name@mail.ng" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-emerald-500 outline-none transition-all disabled:opacity-60" 
-                      value={email} 
-                      onChange={e => setEmail(e.target.value)} 
-                    />
-                  </div>
-                  <button 
-                    type="submit" 
-                    disabled={isLoading} 
-                    className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 disabled:bg-emerald-800 disabled:shadow-none"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center justify-center gap-3">
-                        <LoadingSpinner />
-                        <span>Processing...</span>
-                      </div>
-                    ) : (
-                      'Send Recovery Link'
-                    )}
-                  </button>
-                </form>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <button 
-              disabled={isLoading}
-              onClick={() => setView('login')} 
-              className="text-emerald-600 font-bold text-xs hover:underline flex items-center gap-1 disabled:opacity-50"
-            >
-              ← Back to Login
-            </button>
-            <div className="mb-4">
-              <h3 className="text-2xl font-black text-slate-900">Create Account</h3>
-              <p className="text-sm text-slate-400">Join the clean city initiative today.</p>
-            </div>
-            <div className="grid grid-cols-3 gap-2 p-1.5 bg-slate-100 rounded-2xl">
-              {[
-                { id: UserRole.RESIDENT, label: 'Resident' },
-                { id: UserRole.PSP_OPERATOR, label: 'Operator' },
-                { id: UserRole.ADMIN, label: 'Admin' }
-              ].map((r) => (
-                <button 
-                  key={r.id} 
-                  disabled={isLoading}
-                  onClick={() => setRegisterRole(r.id)} 
-                  className={`py-2 text-[10px] font-black uppercase rounded-xl transition-all ${registerRole === r.id ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-            {renderError()}
-            <form onSubmit={handleRegisterSubmit} className="space-y-4">
-              <div className="max-h-[50vh] overflow-y-auto pr-2 space-y-4 scrollbar-hide">
-                <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Full Name</label>
-                  <input required disabled={isLoading} type="text" placeholder="Ayo Balogun" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-60" value={name} onChange={e => setName(e.target.value)} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Email</label>
-                    <input required disabled={isLoading} type="email" placeholder="ayo@mail.ng" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-60" value={email} onChange={e => setEmail(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Phone</label>
-                    <input required disabled={isLoading} type="tel" placeholder="080XXXXXXXX" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-60" value={phone} onChange={e => setPhone(e.target.value)} />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Service Area (Ibadan Zone)</label>
-                  <select disabled={isLoading} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-60" value={location} onChange={e => setLocation(e.target.value)}>
-                    <option value="Bodija">Bodija</option>
-                    <option value="Akobo">Akobo</option>
-                    <option value="Challenge">Challenge</option>
-                    <option value="Dugbe">Dugbe</option>
-                    <option value="Moniya">Moniya</option>
-                    <option value="Apata">Apata</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Password</label>
-                    <input required disabled={isLoading} type="password" placeholder="••••••••" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-60" value={password} onChange={e => setPassword(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Confirm</label>
-                    <input required disabled={isLoading} type="password" placeholder="••••••••" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-60" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
-                  </div>
-                </div>
-              </div>
-              <button 
-                type="submit" 
-                disabled={isLoading} 
-                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 disabled:bg-emerald-800 disabled:shadow-none"
-              >
-                {isLoading ? (
-                  <div className="flex items-center justify-center gap-3">
-                    <LoadingSpinner />
-                    <span>Creating Account...</span>
-                  </div>
-                ) : (
-                  'Join Waste Up'
-                )}
-              </button>
-            </form>
-          </div>
+            <p className="text-center text-[10px] text-slate-400 mt-6">
+              Don't have an account? <button type="button" onClick={() => setView('register')} className="text-emerald-600 font-bold">Sign Up</button>
+            </p>
+          </form>
         )}
+
+        {/* REGISTER VIEW */}
+        {view === 'register' && (
+          <form onSubmit={handleRegisterSubmit} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Full Name</label>
+                <input required type="text" value={name} onChange={e => setName(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none dark:text-white" />
+              </div>
+              <div>
+                <label className="block text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Phone</label>
+                <input required type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none dark:text-white" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Email</label>
+              <input required type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none dark:text-white" />
+            </div>
+            <div>
+              <label className="block text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Primary Zone</label>
+              <select value={location} onChange={e => setLocation(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none dark:text-white font-bold">
+                <option value="Bodija">Bodija</option>
+                <option value="Akobo">Akobo</option>
+                <option value="Challenge">Challenge</option>
+                <option value="Dugbe">Dugbe</option>
+                <option value="Moniya">Moniya</option>
+                <option value="Apata">Apata</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Password</label>
+                <input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none dark:text-white" />
+              </div>
+              <div>
+                <label className="block text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Confirm</label>
+                <input required type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none dark:text-white" />
+              </div>
+            </div>
+            <button 
+              type="submit" 
+              disabled={isLoading} 
+              className="w-full bg-emerald-600 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 mt-2 shadow-lg disabled:opacity-50"
+            >
+              {isLoading ? 'CREATING...' : 'CREATE ACCOUNT'}
+            </button>
+            <p className="text-center text-[10px] text-slate-400 mt-4">
+              Already have an account? <button type="button" onClick={() => setView('login')} className="text-emerald-600 font-bold">Login</button>
+            </p>
+          </form>
+        )}
+
+        {/* FORGOT PASSWORD VIEW */}
+        {view === 'forgot' && (
+          <form onSubmit={handleForgotSubmit} className="space-y-4">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed text-center">Enter your registered email and we'll send reset instructions.</p>
+            <div>
+              <label className="block text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Email Address</label>
+              <input required type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none dark:text-white" />
+            </div>
+            <button 
+              type="submit" 
+              disabled={isLoading} 
+              className="w-full bg-slate-900 dark:bg-slate-700 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 shadow-md disabled:opacity-50"
+            >
+              {isLoading ? 'SENDING...' : 'SEND RESET LINK'}
+            </button>
+            <button type="button" onClick={() => setView('login')} className="w-full text-xs text-slate-400 font-bold hover:text-slate-600">Back to Login</button>
+          </form>
+        )}
+
       </div>
-      
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </div>
   );
 };

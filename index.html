@@ -18,6 +18,11 @@
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
             },
+            fontSize: {
+              'xs': '0.75rem',
+              'sm': '0.8125rem',
+              'base': '0.875rem',
+            }
           }
         }
       }
@@ -26,25 +31,20 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc;
-            transition: background-color 0.3s ease, color 0.3s ease;
+            transition: background-color 0.2s ease, color 0.2s ease;
+            font-size: 0.875rem; /* Standardizing for professional look */
         }
         .dark body {
             background-color: #020617;
         }
-        /* Fix for Leaflet controls appearance */
         .leaflet-container {
             font-family: 'Inter', sans-serif !important;
-            border-radius: 2rem;
+            border-radius: 1rem;
             z-index: 1;
         }
         .leaflet-control-zoom {
             border: none !important;
-            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1) !important;
-        }
-        .leaflet-control-zoom-in, .leaflet-control-zoom-out {
-            background-color: #fff !important;
-            color: #0f172a !important;
-            border: 1px solid #e2e8f0 !important;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
         }
     </style>
 <script type="importmap">

@@ -5,7 +5,6 @@ import { IBADAN_ZONES } from '../constants';
 import { getRouteOptimizationAdvice, RouteOptimizationResult } from '../services/geminiService';
 import { apiService } from '../services/apiService';
 
-// Add type for Leaflet since it's loaded via script tag
 declare const L: any;
 
 interface FullMapViewProps {
@@ -22,73 +21,49 @@ export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [optimization, setOptimization] = useState<RouteOptimizationResult | null>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
-  const [allPsps, setAllPsps] = useState<User[]>([]);
   const [isUpdatingUser, setIsUpdatingUser] = useState(false);
+  const [allPsps, setAllPsps] = useState<User[]>([]);
 
   const isResident = user.role === UserRole.RESIDENT;
 
   // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
-
-    // Ibadan coordinates
     const initialLat = user.coordinates?.lat || 7.3775;
     const initialLng = user.coordinates?.lng || 3.9470;
-
     mapRef.current = L.map(mapContainerRef.current).setView([initialLat, initialLng], 13);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(mapRef.current);
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(mapRef.current);
+    return () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
   }, [user.coordinates]);
 
-  // Fetch PSPs for Resident View
+  // Fetch PSPs
   useEffect(() => {
     if (isResident) {
-      apiService.getUsers().then(users => {
-        setAllPsps(users.filter(u => u.role === UserRole.PSP_OPERATOR));
-      });
+      apiService.getUsers().then(users => setAllPsps(users.filter(u => u.role === UserRole.PSP_OPERATOR)));
     }
   }, [isResident]);
 
-  // Update Markers when data or role changes
+  // Update Markers
   useEffect(() => {
     if (!mapRef.current) return;
-
-    // Clear existing markers
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
     if (polylineRef.current) polylineRef.current.remove();
 
-    // 1. My Location Marker
     if (user.coordinates) {
       const userIcon = L.divIcon({
-        html: `<div class="w-8 h-8 bg-emerald-600 rounded-xl flex items-center justify-center text-xl shadow-xl ring-2 ring-white border-2 border-emerald-500">🏠</div>`,
-        className: 'custom-div-icon',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
+        html: `<div class="w-6 h-6 bg-emerald-600 rounded-lg flex items-center justify-center text-sm shadow-md border-2 border-white">🏠</div>`,
+        className: 'custom-div-icon', iconSize: [24, 24], iconAnchor: [12, 12]
       });
-      const userMarker = L.marker([user.coordinates.lat, user.coordinates.lng], { icon: userIcon }).addTo(mapRef.current);
-      userMarker.bindPopup('<b>My Home</b><br/>Waste Collection Zone');
-      markersRef.current.push(userMarker);
+      markersRef.current.push(L.marker([user.coordinates.lat, user.coordinates.lng], { icon: userIcon }).addTo(mapRef.current));
     }
 
-    // 2. Data Markers (PSPs for residents, Pickups for operators)
     if (isResident) {
       allPsps.forEach(psp => {
         if (!psp.coordinates) return;
         const pspIcon = L.divIcon({
-          html: `<div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-xl shadow-xl border-2 border-white transition-transform hover:scale-110">🚛</div>`,
-          className: 'custom-div-icon',
-          iconSize: [40, 40],
-          iconAnchor: [20, 20]
+          html: `<div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-base shadow-lg border-2 border-white">🚛</div>`,
+          className: 'custom-div-icon', iconSize: [32, 32], iconAnchor: [16, 16]
         });
         const marker = L.marker([psp.coordinates.lat, psp.coordinates.lng], { icon: pspIcon }).addTo(mapRef.current);
         marker.on('click', () => setSelectedItem(psp));
@@ -96,63 +71,37 @@ export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
       });
     } else {
       const activePickups = requests.filter(r => r.status !== PickupStatus.COMPLETED && r.status !== PickupStatus.CANCELLED);
-      
       activePickups.forEach((req, idx) => {
         if (!req.coordinates) return;
         const stopOrder = optimization ? optimization.optimizedOrder.indexOf(idx) + 1 : null;
-        
         const pinIcon = L.divIcon({
-          html: `<div class="w-10 h-10 rounded-full border-2 border-white shadow-xl flex items-center justify-center text-sm font-black text-white
-                    ${req.status === PickupStatus.SCHEDULED ? 'bg-blue-500' : 'bg-orange-500'}
-                    ${stopOrder ? 'ring-4 ring-emerald-500/50' : ''}
-                  ">
-                    ${stopOrder || '📍'}
-                  </div>`,
-          className: 'custom-div-icon',
-          iconSize: [40, 40],
-          iconAnchor: [20, 20]
+          html: `<div class="w-8 h-8 rounded-full border-2 border-white shadow-md flex items-center justify-center text-[10px] font-black text-white ${req.status === PickupStatus.SCHEDULED ? 'bg-blue-500' : 'bg-orange-500'}">${stopOrder || '📍'}</div>`,
+          className: 'custom-div-icon', iconSize: [32, 32], iconAnchor: [16, 16]
         });
         const marker = L.marker([req.coordinates.lat, req.coordinates.lng], { icon: pinIcon }).addTo(mapRef.current);
         marker.on('click', () => setSelectedItem(req));
         markersRef.current.push(marker);
       });
 
-      // Draw Optimization Path
       if (optimization && activePickups.length > 1) {
         const pathPoints = optimization.optimizedOrder
           .map(idx => activePickups[idx])
           .filter(r => r && r.coordinates)
           .map(r => [r.coordinates!.lat, r.coordinates!.lng]);
-        
-        polylineRef.current = L.polyline(pathPoints, {
-          color: '#10b981',
-          weight: 4,
-          opacity: 0.7,
-          dashArray: '10, 10',
-          lineJoin: 'round'
-        }).addTo(mapRef.current);
+        polylineRef.current = L.polyline(pathPoints, { color: '#10b981', weight: 4, opacity: 0.6, dashArray: '8, 8' }).addTo(mapRef.current);
       }
     }
   }, [allPsps, requests, optimization, isResident, user]);
 
-  const activePickups = useMemo(() => 
-    requests.filter(r => r.status !== PickupStatus.COMPLETED && r.status !== PickupStatus.CANCELLED),
-    [requests]
-  );
-
   const handleOptimizeRoute = async () => {
-    if (activePickups.length === 0) return;
+    const active = requests.filter(r => r.status !== PickupStatus.COMPLETED);
+    if (active.length < 2) return;
     setIsOptimizing(true);
-    // Use street names/landmarks for AI optimization
-    const locations = activePickups.map(r => `${r.houseNumber} ${r.streetName}, ${r.location}, Ibadan`);
     try {
-      const result = await getRouteOptimizationAdvice(locations);
+      const result = await getRouteOptimizationAdvice(active.map(r => `${r.houseNumber} ${r.streetName}, ${r.location}`));
       setOptimization(result);
-      if (result.justification) {
-        alert("AI Optimization: " + result.justification);
-      }
-    } catch (error) {
-      console.error(error);
+    } catch (e) {
+      console.error(e);
     } finally {
       setIsOptimizing(false);
     }
@@ -160,17 +109,7 @@ export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
 
   const handleLaunchNavigator = () => {
     if (!selectedItem || !selectedItem.coordinates) return;
-    const { lat, lng } = selectedItem.coordinates;
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-    window.open(url, '_blank');
-  };
-
-  const handleLocalRadar = () => {
-    if (user.coordinates && mapRef.current) {
-      mapRef.current.flyTo([user.coordinates.lat, user.coordinates.lng], 15, {
-        duration: 1.5
-      });
-    }
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${selectedItem.coordinates.lat},${selectedItem.coordinates.lng}`, '_blank');
   };
 
   const handleRequestPartnership = async () => {
@@ -179,192 +118,106 @@ export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
     try {
       const updatedUser = { ...user, preferredPspId: selectedItem.id };
       await apiService.saveUser(updatedUser);
-      // In a real app we'd reload the auth token/context
-      alert(`Success! ${selectedItem.name} is now your preferred waste partner.`);
-    } catch (err) {
-      console.error(err);
+      alert(`Partnership Request Sent! ${selectedItem.name} has been set as your preferred provider.`);
     } finally {
       setIsUpdatingUser(false);
     }
   };
 
-  const sortedPickups = useMemo(() => {
-    if (!optimization) return activePickups;
-    return optimization.optimizedOrder.map(idx => activePickups[idx]).filter(Boolean);
-  }, [activePickups, optimization]);
+  const sortedItems = useMemo(() => {
+    const list = isResident ? allPsps : requests.filter(r => r.status !== PickupStatus.COMPLETED);
+    if (!isResident && optimization) return optimization.optimizedOrder.map(idx => (list as PickupRequest[])[idx]).filter(Boolean);
+    return list;
+  }, [allPsps, requests, optimization, isResident]);
 
   return (
-    <div className="h-full flex flex-col space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="h-full flex flex-col overflow-hidden gap-3">
+      <div className="flex justify-between items-center shrink-0 px-1">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
-            {isResident ? 'Ibadan Waste Explorer' : 'Operational Map Viewer'}
-          </h2>
-          <p className="text-sm text-slate-500">
-            {isResident 
-              ? `Real-time map of waste management providers in Ibadan.` 
-              : `Managing ${activePickups.length} active stops in ${user.location}`
-            }
-          </p>
+          <h2 className="text-sm font-bold text-slate-800 dark:text-white">Ibadan Operational Map</h2>
+          <p className="text-[10px] text-slate-500">{isResident ? 'Find and partner with verified PSP operators.' : 'Efficiently manage your collection route.'}</p>
         </div>
-        <div className="flex gap-2">
-           {!isResident && (
-              <button 
-                onClick={handleOptimizeRoute}
-                disabled={isOptimizing || activePickups.length < 2}
-                className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-200 dark:shadow-none hover:bg-emerald-700 transition-all flex items-center gap-2 disabled:opacity-50"
-              >
-                {isOptimizing ? '🤖 Analyzing Traffic...' : '✨ Optimize Route'}
-              </button>
-           )}
-           <button 
-             onClick={handleLocalRadar}
-             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center gap-2"
-           >
-             📡 Local Radar
-           </button>
+        <div className="flex gap-1.5">
+          {!isResident && (
+            <button 
+              onClick={handleOptimizeRoute}
+              disabled={isOptimizing || requests.filter(r => r.status !== PickupStatus.COMPLETED).length < 2}
+              className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold shadow hover:bg-emerald-700 transition-all disabled:opacity-50"
+            >
+              {isOptimizing ? '🤖 Optimizing...' : '✨ AI Optimize'}
+            </button>
+          )}
+          <button 
+            onClick={() => mapRef.current?.flyTo([user.coordinates?.lat || 7.3775, user.coordinates?.lng || 3.9470], 15)} 
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-600 dark:text-slate-400"
+          >
+            📡 Local Radar
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0">
-        <div className="flex-1 rounded-[2.5rem] relative overflow-hidden border-8 border-slate-800 dark:border-slate-900 shadow-2xl group z-0">
+      <div className="flex-1 flex flex-col md:flex-row gap-3 min-h-0 overflow-hidden">
+        <div className="flex-1 rounded-xl relative overflow-hidden border-4 border-slate-800 dark:border-slate-900 shadow-xl z-0">
           <div ref={mapContainerRef} className="w-full h-full" />
-          
-          {/* Floating Map Legend */}
-          <div className="absolute bottom-6 left-6 bg-slate-800/80 dark:bg-slate-900/80 backdrop-blur-md p-4 rounded-3xl border border-slate-700 shadow-xl pointer-events-none z-[1000]">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Map Key</h4>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                <span className="text-[10px] text-slate-200 font-bold uppercase tracking-tighter">My Location</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-600"></div>
-                <span className="text-[10px] text-slate-200 font-bold uppercase tracking-tighter">{isResident ? 'PSP Truck' : 'Scheduled'}</span>
-              </div>
-              {!isResident && (
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                  <span className="text-[10px] text-slate-200 font-bold uppercase tracking-tighter">Needs Pickup</span>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
-        {/* Sidebar Info Panel */}
-        <div className="w-full lg:w-80 flex flex-col gap-6">
-          <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border border-slate-200 dark:border-slate-800 shadow-sm flex-1 flex flex-col min-h-0">
-            <h3 className="font-black text-slate-800 dark:text-white uppercase tracking-widest text-xs mb-6 flex justify-between items-center">
-              <span>{isResident ? 'Near Operators' : 'Route Sequence'}</span>
-              <span className="bg-slate-100 dark:bg-slate-800 text-[10px] px-2 py-0.5 rounded text-slate-500">
-                {isResident ? allPsps.length : activePickups.length} Results
-              </span>
-            </h3>
-            
-            <div className="flex-1 overflow-y-auto pr-2 space-y-4 scrollbar-hide">
-              {(isResident ? allPsps : sortedPickups).map((item, i) => (
+        <div className="w-full md:w-72 flex flex-col gap-3 shrink-0 min-h-0">
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 flex flex-col min-h-0">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">{isResident ? 'Near Providers' : 'Job Sequence'}</h3>
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2 scrollbar-hide">
+              {sortedItems.map((item, i) => (
                 <button
                   key={item.id}
-                  onClick={() => {
-                    setSelectedItem(item);
-                    if (item.coordinates && mapRef.current) {
-                      mapRef.current.flyTo([item.coordinates.lat, item.coordinates.lng], 16);
-                    }
-                  }}
-                  className={`w-full p-4 rounded-2xl border transition-all text-left flex gap-4 items-center group
-                    ${selectedItem?.id === item.id ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-800' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-600'}
-                  `}
+                  onClick={() => { setSelectedItem(item); if (item.coordinates) mapRef.current?.flyTo([item.coordinates.lat, item.coordinates.lng], 16); }}
+                  className={`w-full p-2.5 rounded-lg border text-left flex gap-3 items-center transition-all ${selectedItem?.id === item.id ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-800' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}
                 >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-black text-xs
-                    ${isResident ? 'bg-blue-600 text-white' : (optimization ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400')}
-                  `}>
-                    {isResident ? '🚛' : (optimization ? i + 1 : '📍')}
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${isResident ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                    {isResident ? '🚛' : i + 1}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{isResident ? item.name : item.residentName}</p>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-widest truncate">{item.location}</p>
+                    <p className="text-[11px] font-bold text-slate-900 dark:text-white truncate">{isResident ? (item as User).name : (item as PickupRequest).residentName}</p>
+                    <p className="text-[9px] text-slate-400 truncate">{item.location}</p>
                   </div>
                 </button>
               ))}
-              {(isResident ? allPsps : sortedPickups).length === 0 && (
-                <div className="py-10 text-center opacity-40">
-                  <p className="text-xs font-bold text-slate-400 italic">No active data to display on map.</p>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Selected Marker Detail Card */}
-          <div className={`bg-slate-900 dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-800 shadow-2xl transition-all duration-500 ${selectedItem ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
-             {selectedItem && (
-               <>
-                 <div className="flex justify-between items-start mb-6">
-                   <h4 className="text-white font-black text-xs uppercase tracking-[0.2em]">{isResident ? 'Provider Hub' : 'Job Details'}</h4>
-                   <button onClick={() => setSelectedItem(null)} className="text-slate-600 hover:text-white text-lg">✕</button>
+          {selectedItem && (
+            <div className="bg-slate-900 rounded-xl p-4 border border-slate-800 shadow-xl animate-in slide-in-from-right-4">
+               <div className="flex justify-between items-start mb-3">
+                 <h4 className="text-white font-black text-[9px] uppercase tracking-widest">{isResident ? 'PSP Profile' : 'Resident Info'}</h4>
+                 <button onClick={() => setSelectedItem(null)} className="text-slate-500 hover:text-white text-xs">✕</button>
+               </div>
+               <div className="space-y-3">
+                 <p className="text-sm text-emerald-400 font-bold truncate">{isResident ? (selectedItem as User).name : (selectedItem as PickupRequest).residentName}</p>
+                 <div className="grid grid-cols-2 gap-2 text-[10px]">
+                    <div className="text-slate-400">Zone: <span className="text-white">{selectedItem.location}</span></div>
+                    {!isResident && <div className="text-slate-400">Status: <span className="text-blue-400">{selectedItem.status}</span></div>}
                  </div>
-                 <div className="space-y-6">
-                   <div>
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{isResident ? 'Operator Name' : 'Resident Name'}</p>
-                     <p className="text-lg text-emerald-400 font-bold">{isResident ? selectedItem.name : selectedItem.residentName}</p>
-                   </div>
-                   
-                   <div className="grid grid-cols-2 gap-4">
-                     <div>
-                       <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Zone</p>
-                       <p className="text-xs text-white font-medium">{selectedItem.location}</p>
-                     </div>
-                     {!isResident && (
-                        <div>
-                          <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Status</p>
-                          <p className="text-xs text-blue-400 font-bold uppercase tracking-widest">{selectedItem.status}</p>
-                        </div>
-                     )}
-                   </div>
-
-                   <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
-                      <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-xl">📞</div>
-                      <div>
-                        <p className="text-[10px] font-black text-slate-500 uppercase mb-0.5">Contact</p>
-                        <p className="text-xs text-white font-bold">{selectedItem.phone || selectedItem.contactPhone}</p>
-                      </div>
-                   </div>
-
-                   <div className="flex flex-col gap-3">
-                    <button 
-                      onClick={handleLaunchNavigator}
-                      className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-700 transition-colors border border-slate-700 shadow-xl"
-                    >
-                      🚀 Launch Navigator
-                    </button>
-                    {isResident ? (
-                      <button 
-                        onClick={handleRequestPartnership}
-                        disabled={isUpdatingUser || user.preferredPspId === selectedItem.id}
-                        className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-emerald-900/40 ${user.preferredPspId === selectedItem.id ? 'bg-emerald-900/50 text-emerald-500 cursor-not-allowed border border-emerald-500/30' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
-                      >
-                        {isUpdatingUser ? 'Processing...' : user.preferredPspId === selectedItem.id ? 'Current Partner' : 'Request Partnership'}
-                      </button>
-                    ) : (
-                      <button 
-                        className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700 transition-colors shadow-xl shadow-emerald-900/40"
-                      >
-                        ✅ Complete Pickup
-                      </button>
-                    )}
-                   </div>
+                 <div className="flex flex-col gap-2 pt-1">
+                   <button 
+                    onClick={handleLaunchNavigator} 
+                    className="w-full bg-slate-800 text-white py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 transition-colors border border-slate-700 shadow-sm"
+                   >
+                     🚀 Navigate
+                   </button>
+                   {isResident && (
+                     <button 
+                      onClick={handleRequestPartnership}
+                      disabled={isUpdatingUser || user.preferredPspId === selectedItem.id}
+                      className={`w-full py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${user.preferredPspId === selectedItem.id ? 'bg-emerald-900/50 text-emerald-500 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+                     >
+                       {isUpdatingUser ? 'WAIT...' : user.preferredPspId === selectedItem.id ? 'PRIMARY PARTNER' : 'SET AS PARTNER'}
+                     </button>
+                   )}
                  </div>
-               </>
-             )}
-          </div>
+               </div>
+            </div>
+          )}
         </div>
       </div>
-
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        .custom-div-icon { background: none; border: none; }
-      `}</style>
+      <style>{`.custom-div-icon { background: none; border: none; } .scrollbar-hide::-webkit-scrollbar { display: none; }`}</style>
     </div>
   );
 };
