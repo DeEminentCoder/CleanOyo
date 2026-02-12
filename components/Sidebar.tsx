@@ -68,19 +68,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, onTabChange, 
         </nav>
 
         <div className="mt-auto pt-6 border-t border-slate-800">
-          <div className="flex items-center gap-3 mb-6 bg-slate-800/50 p-3 rounded-xl">
+          {/* Clickable Profile Footer */}
+          <button 
+            onClick={() => onTabChange('Settings')}
+            className={`w-full flex items-center gap-3 mb-6 p-3 rounded-xl transition-all duration-200 text-left group hover:bg-slate-800/80 active:scale-[0.98] ${activeTab === 'Settings' ? 'bg-slate-800/50 ring-1 ring-emerald-500/50' : 'bg-slate-800/30'}`}
+          >
             {user.avatar ? (
-              <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-emerald-500" />
+              <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-emerald-500 group-hover:ring-emerald-400 transition-all" />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold ring-2 ring-slate-700">
+              <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold ring-2 ring-slate-700 group-hover:bg-emerald-400 transition-all">
                 {user.name[0]}
               </div>
             )}
             <div className="overflow-hidden">
-              <p className="text-sm font-semibold truncate text-white">{user.name}</p>
-              <p className="text-xs text-slate-400 capitalize">{user.role.replace('_', ' ').toLowerCase()}</p>
+              <p className="text-sm font-semibold truncate text-white group-hover:text-emerald-400 transition-colors">{user.name}</p>
+              <p className="text-[10px] text-slate-400 capitalize group-hover:text-slate-300 transition-colors">Manage Account</p>
             </div>
-          </div>
+          </button>
+          
           <button
             onClick={onLogout}
             className="w-full flex items-center gap-3 p-3 text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded-lg transition-colors"

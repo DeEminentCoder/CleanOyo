@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserRole } from '../types';
+import { UserRole, User } from '../types';
+import { apiService } from '../services/apiService';
 
 interface LoginProps {
   onLogin: (email: string, role: UserRole, password?: string) => Promise<void>;
@@ -46,7 +47,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
       await onLogin(email, selectedRole, password);
     } catch (err: any) {
       setError(err.message || "Login failed. Please check your credentials.");
-    } finally {
       setIsLoading(false);
     }
   };
@@ -78,7 +78,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
       });
     } catch (err: any) {
       setError(err.message || "Registration failed.");
-    } finally {
       setIsLoading(false);
     }
   };
@@ -111,9 +110,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
     );
   };
 
+  const LoadingSpinner = () => (
+    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+  );
+
   return (
     <div className="min-h-screen bg-emerald-50 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Decor */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-100 rounded-full blur-3xl opacity-50 -mr-48 -mt-48"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-200 rounded-full blur-3xl opacity-50 -ml-48 -mb-48"></div>
       
@@ -136,8 +138,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
               ].map((r) => (
                 <button
                   key={r.id}
+                  disabled={isLoading}
                   onClick={() => setSelectedRole(r.id)}
-                  className={`py-2 text-[10px] font-black uppercase rounded-xl transition-all ${selectedRole === r.id ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`py-2 text-[10px] font-black uppercase rounded-xl transition-all ${selectedRole === r.id ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {r.label}
                 </button>
@@ -151,9 +154,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Email Address</label>
                 <input 
                   required 
+                  disabled={isLoading}
                   type="email" 
                   placeholder="name@mail.ng" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-emerald-500 outline-none transition-all" 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-emerald-500 outline-none transition-all disabled:opacity-60" 
                   value={email} 
                   onChange={e => setEmail(e.target.value)} 
                 />
@@ -163,17 +167,19 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Password</label>
                   <button 
                     type="button" 
+                    disabled={isLoading}
                     onClick={() => setView('forgot')}
-                    className="text-[10px] font-bold text-emerald-600 hover:underline"
+                    className="text-[10px] font-bold text-emerald-600 hover:underline disabled:opacity-50"
                   >
                     Forgot Password?
                   </button>
                 </div>
                 <input 
                   required 
+                  disabled={isLoading}
                   type={showPassword ? "text" : "password"} 
                   placeholder="••••••••" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-emerald-500 outline-none transition-all" 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-emerald-500 outline-none transition-all disabled:opacity-60" 
                   value={password} 
                   onChange={e => setPassword(e.target.value)} 
                 />
@@ -188,33 +194,45 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
               <button 
                 type="submit" 
                 disabled={isLoading}
-                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 disabled:opacity-50"
+                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 disabled:bg-emerald-800 disabled:shadow-none"
               >
-                {isLoading ? 'Verifying...' : 'Access Portal'}
+                {isLoading ? (
+                  <div className="flex items-center justify-center gap-3">
+                    <LoadingSpinner />
+                    <span>Verifying...</span>
+                  </div>
+                ) : (
+                  'Access Portal'
+                )}
               </button>
             </form>
 
             <div className="text-center pt-4">
               <p className="text-sm text-slate-500">
                 New to Waste Up? 
-                <button onClick={() => setView('register')} className="text-emerald-600 font-bold ml-1 hover:underline">Register Here</button>
+                <button 
+                  disabled={isLoading}
+                  onClick={() => setView('register')} 
+                  className="text-emerald-600 font-bold ml-1 hover:underline disabled:opacity-50"
+                >
+                  Register Here
+                </button>
               </p>
             </div>
           </div>
         ) : view === 'forgot' ? (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
             <button 
+              disabled={isLoading}
               onClick={() => setView('login')} 
-              className="text-emerald-600 font-bold text-xs hover:underline flex items-center gap-1"
+              className="text-emerald-600 font-bold text-xs hover:underline flex items-center gap-1 disabled:opacity-50"
             >
               ← Back to Login
             </button>
-            
             <div className="mb-4">
               <h3 className="text-2xl font-black text-slate-900">Reset Password</h3>
               <p className="text-sm text-slate-400">Enter your email to receive a recovery link.</p>
             </div>
-
             {isResetSent ? (
               <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center animate-in zoom-in-95">
                 <div className="text-4xl mb-4">📧</div>
@@ -222,10 +240,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
                 <p className="text-xs text-emerald-600 leading-relaxed">
                   We've sent a recovery link to <strong>{email}</strong>. Please check your inbox and spam folder.
                 </p>
-                <button 
-                  onClick={() => setView('login')}
-                  className="mt-6 w-full bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors"
-                >
+                <button onClick={() => setView('login')} className="mt-6 w-full bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors">
                   Return to Login
                 </button>
               </div>
@@ -237,19 +252,27 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Account Email</label>
                     <input 
                       required 
+                      disabled={isLoading}
                       type="email" 
                       placeholder="name@mail.ng" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-emerald-500 outline-none transition-all" 
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 focus:ring-2 focus:ring-emerald-500 outline-none transition-all disabled:opacity-60" 
                       value={email} 
                       onChange={e => setEmail(e.target.value)} 
                     />
                   </div>
                   <button 
                     type="submit" 
-                    disabled={isLoading}
-                    className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 disabled:opacity-50"
+                    disabled={isLoading} 
+                    className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 disabled:bg-emerald-800 disabled:shadow-none"
                   >
-                    {isLoading ? 'Processing...' : 'Send Recovery Link'}
+                    {isLoading ? (
+                      <div className="flex items-center justify-center gap-3">
+                        <LoadingSpinner />
+                        <span>Processing...</span>
+                      </div>
+                    ) : (
+                      'Send Recovery Link'
+                    )}
                   </button>
                 </form>
               </>
@@ -258,56 +281,52 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
         ) : (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
             <button 
+              disabled={isLoading}
               onClick={() => setView('login')} 
-              className="text-emerald-600 font-bold text-xs hover:underline flex items-center gap-1"
+              className="text-emerald-600 font-bold text-xs hover:underline flex items-center gap-1 disabled:opacity-50"
             >
               ← Back to Login
             </button>
-            
             <div className="mb-4">
               <h3 className="text-2xl font-black text-slate-900">Create Account</h3>
               <p className="text-sm text-slate-400">Join the clean city initiative today.</p>
             </div>
-
             <div className="grid grid-cols-3 gap-2 p-1.5 bg-slate-100 rounded-2xl">
               {[
                 { id: UserRole.RESIDENT, label: 'Resident' },
                 { id: UserRole.PSP_OPERATOR, label: 'Operator' },
                 { id: UserRole.ADMIN, label: 'Admin' }
               ].map((r) => (
-                <button
-                  key={r.id}
-                  onClick={() => setRegisterRole(r.id)}
-                  className={`py-2 text-[10px] font-black uppercase rounded-xl transition-all ${registerRole === r.id ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}
+                <button 
+                  key={r.id} 
+                  disabled={isLoading}
+                  onClick={() => setRegisterRole(r.id)} 
+                  className={`py-2 text-[10px] font-black uppercase rounded-xl transition-all ${registerRole === r.id ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {r.label}
                 </button>
               ))}
             </div>
-
             {renderError()}
-
             <form onSubmit={handleRegisterSubmit} className="space-y-4">
-              <div className="max-h-[50vh] overflow-y-auto pr-2 space-y-4">
+              <div className="max-h-[50vh] overflow-y-auto pr-2 space-y-4 scrollbar-hide">
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Full Name</label>
-                  <input required type="text" placeholder="Ayo Balogun" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" value={name} onChange={e => setName(e.target.value)} />
+                  <input required disabled={isLoading} type="text" placeholder="Ayo Balogun" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-60" value={name} onChange={e => setName(e.target.value)} />
                 </div>
-                
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Email</label>
-                    <input required type="email" placeholder="ayo@mail.ng" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" value={email} onChange={e => setEmail(e.target.value)} />
+                    <input required disabled={isLoading} type="email" placeholder="ayo@mail.ng" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-60" value={email} onChange={e => setEmail(e.target.value)} />
                   </div>
                   <div>
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Phone</label>
-                    <input required type="tel" placeholder="080XXXXXXXX" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" value={phone} onChange={e => setPhone(e.target.value)} />
+                    <input required disabled={isLoading} type="tel" placeholder="080XXXXXXXX" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-60" value={phone} onChange={e => setPhone(e.target.value)} />
                   </div>
                 </div>
-
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Service Area (Ibadan Zone)</label>
-                  <select className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" value={location} onChange={e => setLocation(e.target.value)}>
+                  <select disabled={isLoading} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-60" value={location} onChange={e => setLocation(e.target.value)}>
                     <option value="Bodija">Bodija</option>
                     <option value="Akobo">Akobo</option>
                     <option value="Challenge">Challenge</option>
@@ -316,30 +335,45 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
                     <option value="Apata">Apata</option>
                   </select>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Password</label>
-                    <input required type="password" placeholder="••••••••" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" value={password} onChange={e => setPassword(e.target.value)} />
+                    <input required disabled={isLoading} type="password" placeholder="••••••••" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-60" value={password} onChange={e => setPassword(e.target.value)} />
                   </div>
                   <div>
                     <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Confirm</label>
-                    <input required type="password" placeholder="••••••••" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+                    <input required disabled={isLoading} type="password" placeholder="••••••••" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none disabled:opacity-60" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
                   </div>
                 </div>
               </div>
-
               <button 
                 type="submit" 
-                disabled={isLoading}
-                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 disabled:opacity-50"
+                disabled={isLoading} 
+                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 disabled:bg-emerald-800 disabled:shadow-none"
               >
-                {isLoading ? 'Creating Account...' : 'Join Waste Up'}
+                {isLoading ? (
+                  <div className="flex items-center justify-center gap-3">
+                    <LoadingSpinner />
+                    <span>Creating Account...</span>
+                  </div>
+                ) : (
+                  'Join Waste Up'
+                )}
               </button>
             </form>
           </div>
         )}
       </div>
+      
+      <style>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 };

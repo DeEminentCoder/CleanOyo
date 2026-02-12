@@ -42,7 +42,7 @@ class NotificationService {
     return notification;
   }
 
-  async sendEmail(type: 'PASSWORD_RESET', email: string, data: any) {
+  async sendEmail(type: 'PASSWORD_RESET' | 'PICKUP_CONFIRMATION', email: string, data: any) {
     console.log(`[Email Gateway] Preparing ${type} for ${email}...`);
     
     const message = await generateEmailContent(type, data);

@@ -1,8 +1,12 @@
 
-import React, { useState, useMemo } from 'react';
-import { User, PickupRequest, PickupStatus } from '../types';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { User, PickupRequest, PickupStatus, UserRole } from '../types';
 import { IBADAN_ZONES } from '../constants';
 import { getRouteOptimizationAdvice, RouteOptimizationResult } from '../services/geminiService';
+import { apiService } from '../services/apiService';
+
+// Add type for Leaflet since it's loaded via script tag
+declare const L: any;
 
 interface FullMapViewProps {
   user: User;
@@ -10,43 +14,180 @@ interface FullMapViewProps {
 }
 
 export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
-  const [selectedPin, setSelectedPin] = useState<PickupRequest | null>(null);
+  const mapRef = useRef<any>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const polylineRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+
+  const [selectedItem, setSelectedItem] = useState<any>(null);
   const [optimization, setOptimization] = useState<RouteOptimizationResult | null>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [allPsps, setAllPsps] = useState<User[]>([]);
+  const [isUpdatingUser, setIsUpdatingUser] = useState(false);
 
-  // Filter for pending/scheduled requests to focus the route
+  const isResident = user.role === UserRole.RESIDENT;
+
+  // Initialize Map
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    // Ibadan coordinates
+    const initialLat = user.coordinates?.lat || 7.3775;
+    const initialLng = user.coordinates?.lng || 3.9470;
+
+    mapRef.current = L.map(mapContainerRef.current).setView([initialLat, initialLng], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(mapRef.current);
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, [user.coordinates]);
+
+  // Fetch PSPs for Resident View
+  useEffect(() => {
+    if (isResident) {
+      apiService.getUsers().then(users => {
+        setAllPsps(users.filter(u => u.role === UserRole.PSP_OPERATOR));
+      });
+    }
+  }, [isResident]);
+
+  // Update Markers when data or role changes
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    // Clear existing markers
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+    if (polylineRef.current) polylineRef.current.remove();
+
+    // 1. My Location Marker
+    if (user.coordinates) {
+      const userIcon = L.divIcon({
+        html: `<div class="w-8 h-8 bg-emerald-600 rounded-xl flex items-center justify-center text-xl shadow-xl ring-2 ring-white border-2 border-emerald-500">🏠</div>`,
+        className: 'custom-div-icon',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+      const userMarker = L.marker([user.coordinates.lat, user.coordinates.lng], { icon: userIcon }).addTo(mapRef.current);
+      userMarker.bindPopup('<b>My Home</b><br/>Waste Collection Zone');
+      markersRef.current.push(userMarker);
+    }
+
+    // 2. Data Markers (PSPs for residents, Pickups for operators)
+    if (isResident) {
+      allPsps.forEach(psp => {
+        if (!psp.coordinates) return;
+        const pspIcon = L.divIcon({
+          html: `<div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-xl shadow-xl border-2 border-white transition-transform hover:scale-110">🚛</div>`,
+          className: 'custom-div-icon',
+          iconSize: [40, 40],
+          iconAnchor: [20, 20]
+        });
+        const marker = L.marker([psp.coordinates.lat, psp.coordinates.lng], { icon: pspIcon }).addTo(mapRef.current);
+        marker.on('click', () => setSelectedItem(psp));
+        markersRef.current.push(marker);
+      });
+    } else {
+      const activePickups = requests.filter(r => r.status !== PickupStatus.COMPLETED && r.status !== PickupStatus.CANCELLED);
+      
+      activePickups.forEach((req, idx) => {
+        if (!req.coordinates) return;
+        const stopOrder = optimization ? optimization.optimizedOrder.indexOf(idx) + 1 : null;
+        
+        const pinIcon = L.divIcon({
+          html: `<div class="w-10 h-10 rounded-full border-2 border-white shadow-xl flex items-center justify-center text-sm font-black text-white
+                    ${req.status === PickupStatus.SCHEDULED ? 'bg-blue-500' : 'bg-orange-500'}
+                    ${stopOrder ? 'ring-4 ring-emerald-500/50' : ''}
+                  ">
+                    ${stopOrder || '📍'}
+                  </div>`,
+          className: 'custom-div-icon',
+          iconSize: [40, 40],
+          iconAnchor: [20, 20]
+        });
+        const marker = L.marker([req.coordinates.lat, req.coordinates.lng], { icon: pinIcon }).addTo(mapRef.current);
+        marker.on('click', () => setSelectedItem(req));
+        markersRef.current.push(marker);
+      });
+
+      // Draw Optimization Path
+      if (optimization && activePickups.length > 1) {
+        const pathPoints = optimization.optimizedOrder
+          .map(idx => activePickups[idx])
+          .filter(r => r && r.coordinates)
+          .map(r => [r.coordinates!.lat, r.coordinates!.lng]);
+        
+        polylineRef.current = L.polyline(pathPoints, {
+          color: '#10b981',
+          weight: 4,
+          opacity: 0.7,
+          dashArray: '10, 10',
+          lineJoin: 'round'
+        }).addTo(mapRef.current);
+      }
+    }
+  }, [allPsps, requests, optimization, isResident, user]);
+
   const activePickups = useMemo(() => 
     requests.filter(r => r.status !== PickupStatus.COMPLETED && r.status !== PickupStatus.CANCELLED),
     [requests]
   );
 
   const handleOptimizeRoute = async () => {
-    if (activePickups.length === 0) {
-      alert("No active pickups to optimize!");
-      return;
-    }
-    
+    if (activePickups.length === 0) return;
     setIsOptimizing(true);
-    const locations = activePickups.map(r => r.location);
+    // Use street names/landmarks for AI optimization
+    const locations = activePickups.map(r => `${r.houseNumber} ${r.streetName}, ${r.location}, Ibadan`);
     try {
       const result = await getRouteOptimizationAdvice(locations);
       setOptimization(result);
+      if (result.justification) {
+        alert("AI Optimization: " + result.justification);
+      }
     } catch (error) {
-      alert("Error generating route optimization. Please try again.");
+      console.error(error);
     } finally {
       setIsOptimizing(false);
     }
   };
 
-  // Helper to map 0-100 coordinates for pins based on Ibadan zones
-  // Mock deterministic positioning for the visualization
-  const getPinPosition = (idx: number) => {
-    const x = 15 + ((idx * 37) % 70);
-    const y = 20 + ((idx * 23) % 60);
-    return { x, y };
+  const handleLaunchNavigator = () => {
+    if (!selectedItem || !selectedItem.coordinates) return;
+    const { lat, lng } = selectedItem.coordinates;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    window.open(url, '_blank');
   };
 
-  // Order of pickups to show in the sidebar and line rendering
+  const handleLocalRadar = () => {
+    if (user.coordinates && mapRef.current) {
+      mapRef.current.flyTo([user.coordinates.lat, user.coordinates.lng], 15, {
+        duration: 1.5
+      });
+    }
+  };
+
+  const handleRequestPartnership = async () => {
+    if (!isResident || !selectedItem || selectedItem.role !== UserRole.PSP_OPERATOR) return;
+    setIsUpdatingUser(true);
+    try {
+      const updatedUser = { ...user, preferredPspId: selectedItem.id };
+      await apiService.saveUser(updatedUser);
+      // In a real app we'd reload the auth token/context
+      alert(`Success! ${selectedItem.name} is now your preferred waste partner.`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUpdatingUser(false);
+    }
+  };
+
   const sortedPickups = useMemo(() => {
     if (!optimization) return activePickups;
     return optimization.optimizedOrder.map(idx => activePickups[idx]).filter(Boolean);
@@ -56,211 +197,162 @@ export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
     <div className="h-full flex flex-col space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Operational Map Viewer</h2>
-          <p className="text-sm text-slate-500">Managing {activePickups.length} active stops in {user.location}</p>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
+            {isResident ? 'Ibadan Waste Explorer' : 'Operational Map Viewer'}
+          </h2>
+          <p className="text-sm text-slate-500">
+            {isResident 
+              ? `Real-time map of waste management providers in Ibadan.` 
+              : `Managing ${activePickups.length} active stops in ${user.location}`
+            }
+          </p>
         </div>
         <div className="flex gap-2">
+           {!isResident && (
+              <button 
+                onClick={handleOptimizeRoute}
+                disabled={isOptimizing || activePickups.length < 2}
+                className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-200 dark:shadow-none hover:bg-emerald-700 transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                {isOptimizing ? '🤖 Analyzing Traffic...' : '✨ Optimize Route'}
+              </button>
+           )}
            <button 
-            onClick={handleOptimizeRoute}
-            disabled={isOptimizing}
-            className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all flex items-center gap-2 disabled:opacity-50"
+             onClick={handleLocalRadar}
+             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center gap-2"
            >
-             {isOptimizing ? '🤖 Calculating...' : '✨ Optimize Route'}
-           </button>
-           <button className="bg-white border border-slate-200 px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all">
-             📡 Sync GPS
+             📡 Local Radar
            </button>
         </div>
       </div>
 
       <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0">
-        {/* Interactive Map Area */}
-        <div className="flex-1 bg-slate-900 rounded-3xl relative overflow-hidden border-8 border-slate-800 shadow-2xl group">
-          {/* Schematic Ibadan Grid */}
-          <div className="absolute inset-0 opacity-10 pointer-events-none">
-             <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                {Array.from({length: 10}).map((_, i) => (
-                  <line key={`v-${i}`} x1={i * 10} y1="0" x2={i * 10} y2="100" stroke="white" strokeWidth="0.1" />
-                ))}
-                {Array.from({length: 10}).map((_, i) => (
-                  <line key={`h-${i}`} x1="0" y1={i * 10} x2="100" y2={i * 10} stroke="white" strokeWidth="0.1" />
-                ))}
-             </svg>
-          </div>
-
-          {/* Zones Circles */}
-          {IBADAN_ZONES.map((zone, idx) => {
-            const isUserZone = zone.name === user.location;
-            return (
-              <div 
-                key={zone.id}
-                className={`absolute w-32 h-32 rounded-full border border-dashed flex items-center justify-center transition-all
-                  ${isUserZone ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-slate-700/40 bg-slate-700/5'}
-                `}
-                style={{ top: `${15 + idx * 8}%`, left: `${10 + idx * 12}%`, transform: 'translate(-50%, -50%)' }}
-              >
-                <div className="text-center opacity-40">
-                  <p className="text-[8px] font-black uppercase text-slate-500 tracking-tighter">{zone.name}</p>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Path Highlight Line */}
-          {optimization && sortedPickups.length > 1 && (
-            <svg className="absolute inset-0 pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
-              <defs>
-                <filter id="glow">
-                  <feGaussianBlur stdDeviation="0.5" result="coloredBlur"/>
-                  <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
-                  </feMerge>
-                </filter>
-              </defs>
-              <polyline 
-                points={sortedPickups.map((_, i) => {
-                  const originalIndex = activePickups.indexOf(sortedPickups[i]);
-                  const p = getPinPosition(originalIndex);
-                  return `${p.x},${p.y}`;
-                }).join(' ')} 
-                fill="none" 
-                stroke="#10b981" 
-                strokeWidth="0.8" 
-                strokeLinecap="round" 
-                strokeDasharray="2 1"
-                filter="url(#glow)"
-                className="animate-[dash_20s_linear_infinite]"
-                style={{ strokeDashoffset: 100 }}
-              />
-            </svg>
-          )}
-
-          {/* Map Pins */}
-          {activePickups.map((req, idx) => {
-            const pos = getPinPosition(idx);
-            const isSelected = selectedPin?.id === req.id;
-            const stopOrder = optimization ? optimization.optimizedOrder.indexOf(idx) + 1 : null;
-            
-            return (
-              <button
-                key={req.id}
-                onClick={() => setSelectedPin(req)}
-                className={`absolute w-10 h-10 -ml-5 -mt-5 flex items-center justify-center transition-all transform hover:scale-125 hover:z-50
-                  ${isSelected ? 'scale-125 z-40' : 'z-30'}
-                `}
-                style={{ top: `${pos.y}%`, left: `${pos.x}%` }}
-              >
-                <div className={`w-full h-full rounded-full border-2 border-white shadow-xl flex flex-col items-center justify-center text-[10px] font-black text-white
-                  ${req.status === PickupStatus.SCHEDULED ? 'bg-blue-500' : 'bg-orange-500'}
-                  ${stopOrder ? 'ring-4 ring-emerald-500/30' : ''}
-                `}>
-                  {stopOrder ? `#${stopOrder}` : '🚛'}
-                </div>
-                {isSelected && (
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full animate-ping"></div>
-                )}
-              </button>
-            );
-          })}
-
-          {/* Floating Legend */}
-          <div className="absolute bottom-6 left-6 bg-slate-800/80 backdrop-blur-md p-4 rounded-2xl border border-slate-700 shadow-xl pointer-events-none">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Map Legend</h4>
-            <div className="space-y-1.5">
+        <div className="flex-1 rounded-[2.5rem] relative overflow-hidden border-8 border-slate-800 dark:border-slate-900 shadow-2xl group z-0">
+          <div ref={mapContainerRef} className="w-full h-full" />
+          
+          {/* Floating Map Legend */}
+          <div className="absolute bottom-6 left-6 bg-slate-800/80 dark:bg-slate-900/80 backdrop-blur-md p-4 rounded-3xl border border-slate-700 shadow-xl pointer-events-none z-[1000]">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Map Key</h4>
+            <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                <span className="text-[10px] text-slate-200 font-bold">Scheduled Stop</span>
+                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                <span className="text-[10px] text-slate-200 font-bold uppercase tracking-tighter">My Location</span>
               </div>
-              {optimization && (
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                <span className="text-[10px] text-slate-200 font-bold uppercase tracking-tighter">{isResident ? 'PSP Truck' : 'Scheduled'}</span>
+              </div>
+              {!isResident && (
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-emerald-500 border border-white"></div>
-                  <span className="text-[10px] text-slate-200 font-bold">AI Optimized Order (#)</span>
+                  <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                  <span className="text-[10px] text-slate-200 font-bold uppercase tracking-tighter">Needs Pickup</span>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Sidebar Panel */}
+        {/* Sidebar Info Panel */}
         <div className="w-full lg:w-80 flex flex-col gap-6">
-          {/* AI Route List */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex-1 flex flex-col min-h-0">
-            <h3 className="font-bold text-slate-800 mb-4 flex items-center justify-between">
-              <span>{optimization ? 'Optimized Path' : 'Assigned Jobs'}</span>
-              <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-400 font-black uppercase tracking-widest">
-                {sortedPickups.length} STOPS
+          <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border border-slate-200 dark:border-slate-800 shadow-sm flex-1 flex flex-col min-h-0">
+            <h3 className="font-black text-slate-800 dark:text-white uppercase tracking-widest text-xs mb-6 flex justify-between items-center">
+              <span>{isResident ? 'Near Operators' : 'Route Sequence'}</span>
+              <span className="bg-slate-100 dark:bg-slate-800 text-[10px] px-2 py-0.5 rounded text-slate-500">
+                {isResident ? allPsps.length : activePickups.length} Results
               </span>
             </h3>
             
-            <div className="flex-1 overflow-y-auto pr-2 space-y-3 scrollbar-hide">
-              {sortedPickups.map((req, i) => (
+            <div className="flex-1 overflow-y-auto pr-2 space-y-4 scrollbar-hide">
+              {(isResident ? allPsps : sortedPickups).map((item, i) => (
                 <button
-                  key={req.id}
-                  onClick={() => setSelectedPin(req)}
-                  className={`w-full p-3 rounded-2xl border transition-all text-left flex gap-3 items-center group
-                    ${selectedPin?.id === req.id ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100 hover:border-slate-200'}
+                  key={item.id}
+                  onClick={() => {
+                    setSelectedItem(item);
+                    if (item.coordinates && mapRef.current) {
+                      mapRef.current.flyTo([item.coordinates.lat, item.coordinates.lng], 16);
+                    }
+                  }}
+                  className={`w-full p-4 rounded-2xl border transition-all text-left flex gap-4 items-center group
+                    ${selectedItem?.id === item.id ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-800' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-600'}
                   `}
                 >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-black text-xs
-                    ${optimization ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'}
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-black text-xs
+                    ${isResident ? 'bg-blue-600 text-white' : (optimization ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400')}
                   `}>
-                    {optimization ? i + 1 : '📍'}
+                    {isResident ? '🚛' : (optimization ? i + 1 : '📍')}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-900 truncate">{req.residentName}</p>
-                    <p className="text-[10px] text-slate-500 truncate">{req.location}</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{isResident ? item.name : item.residentName}</p>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-widest truncate">{item.location}</p>
                   </div>
                 </button>
               ))}
-              
-              {sortedPickups.length === 0 && (
-                <div className="text-center py-10 opacity-40">
-                  <span className="text-3xl block mb-2">📭</span>
-                  <p className="text-xs font-bold">No active stops assigned</p>
+              {(isResident ? allPsps : sortedPickups).length === 0 && (
+                <div className="py-10 text-center opacity-40">
+                  <p className="text-xs font-bold text-slate-400 italic">No active data to display on map.</p>
                 </div>
               )}
             </div>
-
-            {optimization && (
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                <div className="flex items-start gap-3 bg-emerald-50/50 p-3 rounded-xl border border-emerald-100">
-                  <span className="text-lg">💡</span>
-                  <div>
-                    <p className="text-[10px] font-black text-emerald-600 uppercase mb-1">AI Logic</p>
-                    <p className="text-[10px] text-emerald-800 leading-relaxed italic">{optimization.justification}</p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Detail Card */}
-          <div className={`bg-slate-900 rounded-3xl p-6 border border-slate-800 shadow-xl transition-all duration-300 ${selectedPin ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
-             {selectedPin && (
+          {/* Selected Marker Detail Card */}
+          <div className={`bg-slate-900 dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-800 shadow-2xl transition-all duration-500 ${selectedItem ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+             {selectedItem && (
                <>
-                 <div className="flex justify-between items-start mb-4">
-                   <h4 className="text-white font-bold">Stop Details</h4>
-                   <button onClick={() => setSelectedPin(null)} className="text-slate-500 hover:text-white">✕</button>
+                 <div className="flex justify-between items-start mb-6">
+                   <h4 className="text-white font-black text-xs uppercase tracking-[0.2em]">{isResident ? 'Provider Hub' : 'Job Details'}</h4>
+                   <button onClick={() => setSelectedItem(null)} className="text-slate-600 hover:text-white text-lg">✕</button>
                  </div>
-                 <div className="space-y-4">
+                 <div className="space-y-6">
                    <div>
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Location</p>
-                     <p className="text-sm text-emerald-400 font-bold">{selectedPin.location}</p>
+                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{isResident ? 'Operator Name' : 'Resident Name'}</p>
+                     <p className="text-lg text-emerald-400 font-bold">{isResident ? selectedItem.name : selectedItem.residentName}</p>
                    </div>
+                   
                    <div className="grid grid-cols-2 gap-4">
                      <div>
-                       <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Type</p>
-                       <p className="text-xs text-white font-medium">{selectedPin.wasteType.split(' ')[0]}</p>
+                       <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Zone</p>
+                       <p className="text-xs text-white font-medium">{selectedItem.location}</p>
                      </div>
-                     <div>
-                       <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Status</p>
-                       <p className="text-xs text-blue-400 font-bold">{selectedPin.status}</p>
-                     </div>
+                     {!isResident && (
+                        <div>
+                          <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Status</p>
+                          <p className="text-xs text-blue-400 font-bold uppercase tracking-widest">{selectedItem.status}</p>
+                        </div>
+                     )}
                    </div>
-                   <button className="w-full bg-emerald-600 text-white py-3 rounded-xl font-black text-xs hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-900/40">
-                     LAUNCH NAVIGATOR
-                   </button>
+
+                   <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
+                      <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-xl">📞</div>
+                      <div>
+                        <p className="text-[10px] font-black text-slate-500 uppercase mb-0.5">Contact</p>
+                        <p className="text-xs text-white font-bold">{selectedItem.phone || selectedItem.contactPhone}</p>
+                      </div>
+                   </div>
+
+                   <div className="flex flex-col gap-3">
+                    <button 
+                      onClick={handleLaunchNavigator}
+                      className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-700 transition-colors border border-slate-700 shadow-xl"
+                    >
+                      🚀 Launch Navigator
+                    </button>
+                    {isResident ? (
+                      <button 
+                        onClick={handleRequestPartnership}
+                        disabled={isUpdatingUser || user.preferredPspId === selectedItem.id}
+                        className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-emerald-900/40 ${user.preferredPspId === selectedItem.id ? 'bg-emerald-900/50 text-emerald-500 cursor-not-allowed border border-emerald-500/30' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+                      >
+                        {isUpdatingUser ? 'Processing...' : user.preferredPspId === selectedItem.id ? 'Current Partner' : 'Request Partnership'}
+                      </button>
+                    ) : (
+                      <button 
+                        className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700 transition-colors shadow-xl shadow-emerald-900/40"
+                      >
+                        ✅ Complete Pickup
+                      </button>
+                    )}
+                   </div>
                  </div>
                </>
              )}
@@ -269,18 +361,9 @@ export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
       </div>
 
       <style>{`
-        @keyframes dash {
-          to {
-            stroke-dashoffset: 0;
-          }
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .custom-div-icon { background: none; border: none; }
       `}</style>
     </div>
   );

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { User, PickupRequest, PickupStatus, WasteType } from '../types';
-import { STATUS_COLORS, IBADAN_ZONES } from '../constants';
+import { User, PickupRequest, PickupStatus, WasteType, Priority } from '../types';
+import { STATUS_COLORS, IBADAN_ZONES, PRIORITY_COLORS, WASTE_ICONS } from '../constants';
 
 interface PSPOperatorDashboardProps {
   user: User;
@@ -15,15 +15,19 @@ export const PSPOperatorDashboard: React.FC<PSPOperatorDashboardProps> = ({ user
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [formData, setFormData] = useState({
     residentName: '',
-    location: '',
+    houseNumber: '',
+    streetName: '',
+    landmark: '',
+    contactPhone: '',
     wasteType: WasteType.GENERAL,
+    priority: Priority.MEDIUM,
     notes: ''
   });
 
   const stats = [
-    { label: 'Today\'s Total', value: requests.length, icon: '📋' },
-    { label: 'Completed', value: requests.filter(r => r.status === PickupStatus.COMPLETED).length, icon: '✅' },
-    { label: 'Remaining', value: requests.filter(r => r.status !== PickupStatus.COMPLETED).length, icon: '🚛' },
+    { label: 'Pending Approval', value: requests.filter(r => r.status === PickupStatus.PENDING).length, icon: '🔔' },
+    { label: 'Active Jobs', value: requests.filter(r => r.status === PickupStatus.SCHEDULED || r.status === PickupStatus.ON_THE_WAY).length, icon: '🚛' },
+    { label: 'Completed Today', value: requests.filter(r => r.status === PickupStatus.COMPLETED).length, icon: '✅' },
   ];
 
   const handleInitialSubmit = (e: React.FormEvent) => {
@@ -32,12 +36,16 @@ export const PSPOperatorDashboard: React.FC<PSPOperatorDashboardProps> = ({ user
   };
 
   const handleFinalConfirm = () => {
-    // Fix: Updated to use operatorId/operatorName and provided missing createdAt/updatedAt fields.
     onAddRequest({
       residentId: 'guest-' + Date.now(),
       residentName: formData.residentName,
-      location: formData.location,
+      location: user.location,
+      houseNumber: formData.houseNumber,
+      streetName: formData.streetName,
+      landmark: formData.landmark,
+      contactPhone: formData.contactPhone,
       wasteType: formData.wasteType,
+      priority: formData.priority,
       scheduledDate: new Date().toISOString().split('T')[0],
       operatorId: user.id,
       operatorName: user.name,
@@ -45,7 +53,16 @@ export const PSPOperatorDashboard: React.FC<PSPOperatorDashboardProps> = ({ user
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
-    setFormData({ residentName: '', location: '', wasteType: WasteType.GENERAL, notes: '' });
+    setFormData({ 
+      residentName: '', 
+      houseNumber: '', 
+      streetName: '', 
+      landmark: '', 
+      contactPhone: '', 
+      wasteType: WasteType.GENERAL, 
+      priority: Priority.MEDIUM, 
+      notes: '' 
+    });
     setShowConfirmDialog(false);
     setShowAddForm(false);
   };
@@ -53,7 +70,7 @@ export const PSPOperatorDashboard: React.FC<PSPOperatorDashboardProps> = ({ user
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl font-bold text-slate-800">Operator Overview</h2>
+        <h2 className="text-2xl font-bold text-slate-800">Operational Dashboard</h2>
         <button 
           onClick={() => setShowAddForm(!showAddForm)}
           className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
@@ -67,7 +84,7 @@ export const PSPOperatorDashboard: React.FC<PSPOperatorDashboardProps> = ({ user
           <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
             <span>📝</span> Manual Pickup Entry
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Resident Name</label>
               <input 
@@ -80,17 +97,39 @@ export const PSPOperatorDashboard: React.FC<PSPOperatorDashboardProps> = ({ user
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">House Number</label>
               <input 
                 type="text" 
                 required
                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                placeholder="Street address or landmark"
-                value={formData.location}
-                onChange={e => setFormData({...formData, location: e.target.value})}
+                placeholder="Plot 12A"
+                value={formData.houseNumber}
+                onChange={e => setFormData({...formData, houseNumber: e.target.value})}
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Street Name</label>
+              <input 
+                type="text" 
+                required
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                placeholder="Osuntokun Ave"
+                value={formData.streetName}
+                onChange={e => setFormData({...formData, streetName: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+              <input 
+                type="tel" 
+                required
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                placeholder="080XXXXXXXX"
+                value={formData.contactPhone}
+                onChange={e => setFormData({...formData, contactPhone: e.target.value})}
+              />
+            </div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">Waste Type</label>
               <select 
                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
@@ -101,6 +140,26 @@ export const PSPOperatorDashboard: React.FC<PSPOperatorDashboardProps> = ({ user
               </select>
             </div>
             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Urgency</label>
+              <select 
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none font-bold"
+                value={formData.priority}
+                onChange={e => setFormData({...formData, priority: e.target.value as Priority})}
+              >
+                {Object.values(Priority).map(p => <option key={p} value={p}>{p} Priority</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Landmark</label>
+              <input 
+                type="text" 
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                placeholder="Near Market"
+                value={formData.landmark}
+                onChange={e => setFormData({...formData, landmark: e.target.value})}
+              />
+            </div>
+            <div className="md:col-span-4">
               <label className="block text-sm font-medium text-slate-700 mb-1">Notes / Instructions</label>
               <input 
                 type="text" 
@@ -137,19 +196,17 @@ export const PSPOperatorDashboard: React.FC<PSPOperatorDashboardProps> = ({ user
                 <span className="font-semibold text-slate-900">{formData.residentName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Location:</span>
-                <span className="font-semibold text-slate-900 text-right">{formData.location}</span>
+                <span className="text-slate-500">Address:</span>
+                <span className="font-semibold text-slate-900 text-right">{formData.houseNumber} {formData.streetName}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Type:</span>
                 <span className="font-semibold text-emerald-600">{formData.wasteType}</span>
               </div>
-              {formData.notes && (
-                <div className="pt-2 border-t border-slate-200">
-                  <span className="text-slate-500 block mb-1">Notes:</span>
-                  <p className="text-slate-700 italic">"{formData.notes}"</p>
-                </div>
-              )}
+              <div className="flex justify-between">
+                <span className="text-slate-500">Priority:</span>
+                <span className={`font-black uppercase text-[10px] px-2 py-0.5 rounded border ${PRIORITY_COLORS[formData.priority]}`}>{formData.priority}</span>
+              </div>
             </div>
 
             <div className="flex flex-col gap-3">
@@ -188,54 +245,97 @@ export const PSPOperatorDashboard: React.FC<PSPOperatorDashboardProps> = ({ user
         {/* Task List */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xl font-bold text-slate-800">Job Board</h3>
-            <div className="flex gap-2">
-               <button className="px-3 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-md font-bold">Active</button>
-               <button className="px-3 py-1 text-xs bg-slate-100 text-slate-500 rounded-md font-bold">Past</button>
-            </div>
+            <h3 className="text-xl font-bold text-slate-800">Operational Job Board</h3>
           </div>
           
           <div className="space-y-3">
-            {requests.map(req => (
-              <div key={req.id} className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-xl">
-                    {req.residentId.startsWith('guest-') ? '👤' : '📍'}
+            {[...requests].sort((a, b) => {
+              const statusPriority = { [PickupStatus.PENDING]: 0, [PickupStatus.SCHEDULED]: 1, [PickupStatus.ON_THE_WAY]: 2, [PickupStatus.COMPLETED]: 3, [PickupStatus.CANCELLED]: 4 };
+              const priorityMap = { [Priority.HIGH]: 0, [Priority.MEDIUM]: 1, [Priority.LOW]: 2 };
+              
+              if (statusPriority[a.status] !== statusPriority[b.status]) {
+                return statusPriority[a.status] - statusPriority[b.status];
+              }
+              return priorityMap[a.priority] - priorityMap[b.priority];
+            }).map(req => (
+              <div key={req.id} className={`bg-white p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all ${req.priority === Priority.HIGH ? 'ring-2 ring-red-500/10 border-red-100' : ''}`}>
+                <div className="flex gap-4 min-w-0 flex-1">
+                  <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-xl shrink-0">
+                    {WASTE_ICONS[req.wasteType] || '📍'}
                   </div>
-                  <div>
-                    <h5 className="font-bold text-slate-900 flex items-center gap-2">
-                      {req.residentName}
-                      {req.residentId.startsWith('guest-') && <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">Manual Entry</span>}
-                    </h5>
-                    <p className="text-sm text-slate-500">{req.location}</p>
-                    <p className="text-xs font-medium text-emerald-600 mt-1">{req.wasteType}</p>
-                    {req.notes && <p className="text-[10px] text-slate-400 italic mt-1">"{req.notes}"</p>}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <h5 className="font-bold text-slate-900 truncate">
+                        {req.residentName}
+                      </h5>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-widest ${PRIORITY_COLORS[req.priority]}`}>
+                        {req.priority}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-900 font-bold truncate">
+                       🏠 {req.houseNumber} {req.streetName}
+                    </p>
+                    <p className="text-[10px] text-slate-500 font-medium truncate">📞 {req.contactPhone} • {req.wasteType}</p>
+                    {req.notes && <p className="text-[10px] text-slate-400 italic mt-0.5 line-clamp-1">"{req.notes}"</p>}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0">
-                  <select 
-                    value={req.status}
-                    onChange={(e) => onUpdateStatus(req.id, e.target.value as PickupStatus)}
-                    className={`text-xs font-bold p-2 rounded-lg outline-none cursor-pointer ${STATUS_COLORS[req.status]}`}
-                  >
-                    <option value={PickupStatus.SCHEDULED}>SCHEDULED</option>
-                    <option value={PickupStatus.ON_THE_WAY}>ON THE WAY</option>
-                    <option value={PickupStatus.COMPLETED}>COMPLETED</option>
-                    <option value={PickupStatus.CANCELLED}>CANCELLED</option>
-                  </select>
-                  <button className="p-2 text-slate-400 hover:text-emerald-600">🗺️</button>
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0">
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    {req.status === PickupStatus.PENDING && (
+                        <button 
+                            onClick={() => onUpdateStatus(req.id, PickupStatus.SCHEDULED)}
+                            className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-colors"
+                        >
+                            Accept Job
+                        </button>
+                    )}
+                    {req.status === PickupStatus.SCHEDULED && (
+                        <button 
+                            onClick={() => onUpdateStatus(req.id, PickupStatus.ON_THE_WAY)}
+                            className="flex-1 sm:flex-none px-4 py-2 bg-yellow-500 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-yellow-600 transition-colors"
+                        >
+                            Start Journey
+                        </button>
+                    )}
+                    {(req.status === PickupStatus.ON_THE_WAY || req.status === PickupStatus.SCHEDULED) && (
+                        <button 
+                            onClick={() => onUpdateStatus(req.id, PickupStatus.COMPLETED)}
+                            className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-colors"
+                        >
+                            Mark Completed
+                        </button>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[9px] font-black px-2 py-1.5 rounded-lg border uppercase tracking-widest ${STATUS_COLORS[req.status]}`}>
+                        {req.status}
+                    </span>
+                    <a 
+                        href={`tel:${req.contactPhone}`}
+                        className="p-2 bg-slate-100 text-slate-500 hover:text-emerald-600 rounded-lg transition-colors border border-slate-200"
+                        title="Call Resident"
+                    >
+                        📞
+                    </a>
+                  </div>
                 </div>
               </div>
             ))}
+            {requests.length === 0 && (
+                <div className="p-10 text-center text-slate-400 border-2 border-dashed border-slate-200 rounded-xl italic">
+                    No jobs currently assigned to your team.
+                </div>
+            )}
           </div>
         </div>
 
         {/* Zone Map / Quick View */}
         <div className="space-y-4">
-          <h3 className="text-xl font-bold text-slate-800">Route Map (Ibadan)</h3>
+          <h3 className="text-xl font-bold text-slate-800">Operational Zones</h3>
           <div className="bg-slate-200 h-64 rounded-2xl relative overflow-hidden flex items-center justify-center border-4 border-white shadow-inner">
-            <p className="text-slate-400 font-medium z-10">Interactive Map Visualization</p>
+            <p className="text-slate-400 font-medium z-10">Ibadan Deployment Map</p>
             <div className="absolute inset-0 opacity-40">
               <svg viewBox="0 0 100 100" className="w-full h-full">
                 <path d="M10 20 Q 30 10, 50 20 T 90 20" fill="none" stroke="#059669" strokeWidth="1" />
@@ -254,7 +354,7 @@ export const PSPOperatorDashboard: React.FC<PSPOperatorDashboardProps> = ({ user
           </div>
           
           <div className="bg-white p-4 rounded-xl border border-slate-200">
-            <h4 className="font-bold text-sm text-slate-800 mb-3">Zone Legend</h4>
+            <h4 className="font-bold text-sm text-slate-800 mb-3 text-center uppercase tracking-widest text-[10px] text-slate-400">Risk Assessment</h4>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
                  <div className="flex items-center gap-2">

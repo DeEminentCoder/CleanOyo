@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { UserRole, User, PickupRequest, PickupStatus, WasteType, ActivityLog } from './types';
+import { UserRole, User, PickupRequest, PickupStatus, WasteType, ActivityLog, NotificationRecord } from './types';
 import { ResidentDashboard } from './components/ResidentDashboard';
 import { PSPOperatorDashboard } from './components/PSPOperatorDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -33,10 +33,51 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeNotification, setActiveNotification] = useState<Notification | null>(null);
+  const [notificationsHistory, setNotificationsHistory] = useState<NotificationRecord[]>([]);
   const [requests, setRequests] = useState<PickupRequest[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [theme, setTheme] = useState<string>(localStorage.getItem('waste_up_theme') || 'light');
 
-  // Seed DB and Fetch Data
+  // Handle Theme
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('waste_up_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
+  // Centralized data fetcher
+  const refreshData = useCallback(async () => {
+    if (user) {
+      const [reqData, noteData] = await Promise.all([
+        apiService.getRequests(user.id, user.role),
+        apiService.getNotifications(user.id)
+      ]);
+      setRequests(reqData);
+      setNotificationsHistory(noteData);
+      
+      if (user.role === UserRole.ADMIN) {
+         const logData = await apiService.getActivityLogs();
+         setLogs(logData);
+      }
+    }
+  }, [user]);
+
+  // Reactive Data Sync: Fetch data whenever the user changes
+  useEffect(() => {
+    if (user) {
+      refreshData();
+    }
+  }, [user, refreshData]);
+
+  // Startup: Initialize session
   useEffect(() => {
     apiService.seedDatabase();
     const initialize = async () => {
@@ -44,46 +85,28 @@ const App: React.FC = () => {
       if (currentUser) {
         setUser(currentUser);
         setActiveTab(ROLE_DEFAULT_TABS[currentUser.role]);
-        const data = await apiService.getRequests(currentUser.id, currentUser.role);
-        setRequests(data);
-        if (currentUser.role === UserRole.ADMIN) {
-           const logData = await apiService.getActivityLogs();
-           setLogs(logData);
-        }
       }
       setIsInitializing(false);
     };
     initialize();
   }, []);
 
-  // Sync state with API
-  const refreshData = async () => {
-    if (user) {
-      const data = await apiService.getRequests(user.id, user.role);
-      setRequests(data);
-      if (user.role === UserRole.ADMIN) {
-         const logData = await apiService.getActivityLogs();
-         setLogs(logData);
-      }
-    }
-  };
-
-  // Notification Toast logic
+  // Notification Toast Logic
   useEffect(() => {
+    if (!user) return;
     const unsubscribe = notificationService.subscribe((n) => {
       setActiveNotification(n);
-      refreshData(); // Refresh to show new request/log instantly
+      refreshData(); 
       setTimeout(() => setActiveNotification(null), 7000);
     });
     return unsubscribe;
-  }, [user]);
+  }, [user, refreshData]);
 
   const handleLogin = async (email: string, selectedRole: UserRole, password?: string) => {
     try {
       const { user: loggedInUser } = await authService.login(email, selectedRole, password);
       setUser(loggedInUser);
       setActiveTab(ROLE_DEFAULT_TABS[selectedRole]);
-      await refreshData();
     } catch (error: any) {
       throw error;
     }
@@ -94,7 +117,6 @@ const App: React.FC = () => {
       const { user: registeredUser } = await authService.register(details);
       setUser(registeredUser);
       setActiveTab(ROLE_DEFAULT_TABS[details.role]);
-      await refreshData();
     } catch (error: any) {
       throw error;
     }
@@ -119,6 +141,7 @@ const App: React.FC = () => {
     setUser(null);
     setActiveTab('');
     setRequests([]);
+    setNotificationsHistory([]);
     setIsSidebarOpen(false);
   };
 
@@ -134,18 +157,26 @@ const App: React.FC = () => {
     await refreshData();
   };
 
+  const clearNotifications = async () => {
+    if (user) {
+      await apiService.clearNotifications(user.id);
+      setNotificationsHistory([]);
+    }
+  };
+
   const renderContent = () => {
     if (!user) return null;
     const tab = ROLE_MENU_ITEMS[user.role].some(i => i.label === activeTab) ? activeTab : ROLE_DEFAULT_TABS[user.role];
 
     if (user.role === UserRole.RESIDENT) {
       switch (tab) {
-        case 'Dashboard': return <ResidentDashboard user={user} requests={requests} onAddRequest={addRequest} />;
+        case 'Dashboard': return <ResidentDashboard user={user} requests={requests} onAddRequest={addRequest} onUpdateStatus={updateRequestStatus} />;
         case 'My Schedule': return <ResidentSchedule requests={requests} />;
         case 'History': return <ResidentHistory requests={requests} />;
+        case 'Map Explorer': return <FullMapView user={user} requests={requests} />;
         case 'Waste Tips': return <WasteTipsView />;
         case 'Settings': return <ProfileSettings user={user} onUpdateUser={handleUpdateUser} />;
-        default: return <ResidentDashboard user={user} requests={requests} onAddRequest={addRequest} />;
+        default: return <ResidentDashboard user={user} requests={requests} onAddRequest={addRequest} onUpdateStatus={updateRequestStatus} />;
       }
     }
 
@@ -176,11 +207,11 @@ const App: React.FC = () => {
     return null;
   };
 
-  if (isInitializing) return <div className="min-h-screen flex items-center justify-center bg-emerald-50 font-bold text-emerald-800 animate-pulse">Initializing Waste Up Ibadan Portal...</div>;
+  if (isInitializing) return <div className="min-h-screen flex items-center justify-center bg-emerald-50 dark:bg-slate-900 font-bold text-emerald-800 animate-pulse transition-colors duration-300">Initializing Waste Up Ibadan Portal...</div>;
   if (!user) return <Login onLogin={handleLogin} onRegister={handleRegister} onForgotPassword={handleForgotPassword} />;
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden relative">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden relative transition-colors duration-300">
       <Sidebar 
         user={user} 
         activeTab={activeTab} 
@@ -197,13 +228,19 @@ const App: React.FC = () => {
           user={user} 
           currentTab={activeTab} 
           onMenuClick={() => setIsSidebarOpen(true)}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          notifications={notificationsHistory as any}
+          onClearNotifications={clearNotifications}
         />
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">{renderContent()}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 transition-colors duration-300">
+          {renderContent()}
+        </main>
       </div>
 
       {activeNotification && (
         <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-right-10 fade-in duration-300">
-          <div className={`bg-slate-900 text-white p-4 rounded-2xl shadow-2xl border ${activeNotification.medium === 'SMS' ? 'border-emerald-700' : 'border-blue-700'} max-w-sm flex gap-4`}>
+          <div className={`bg-slate-900 dark:bg-slate-800 text-white p-4 rounded-2xl shadow-2xl border ${activeNotification.medium === 'SMS' ? 'border-emerald-700' : 'border-blue-700'} max-w-sm flex gap-4`}>
             <div className={`w-10 h-10 ${activeNotification.medium === 'SMS' ? 'bg-emerald-600' : 'bg-blue-600'} rounded-full flex items-center justify-center text-xl shrink-0`}>
               {activeNotification.medium === 'SMS' ? '📱' : '✉️'}
             </div>

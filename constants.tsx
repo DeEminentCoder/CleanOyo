@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { PickupStatus, WasteType, ZoneData, UserRole } from './types';
+import { PickupStatus, WasteType, ZoneData, UserRole, Priority } from './types';
 
 export const IBADAN_ZONES: ZoneData[] = [
   { id: '1', name: 'Bodija', floodRisk: 'Low', activeRequests: 12, coordinates: [7.4443, 3.9187] },
@@ -17,6 +17,12 @@ export const STATUS_COLORS = {
   [PickupStatus.COMPLETED]: 'bg-green-100 text-green-800',
   [PickupStatus.CANCELLED]: 'bg-red-100 text-red-800',
   [PickupStatus.PENDING]: 'bg-slate-100 text-slate-800',
+};
+
+export const PRIORITY_COLORS = {
+  [Priority.LOW]: 'bg-slate-50 text-slate-600 border-slate-200',
+  [Priority.MEDIUM]: 'bg-blue-50 text-blue-700 border-blue-100',
+  [Priority.HIGH]: 'bg-red-50 text-red-700 border-red-100 animate-pulse shadow-sm shadow-red-100',
 };
 
 export const WASTE_ICONS = {
@@ -36,6 +42,7 @@ export const ROLE_MENU_ITEMS: Record<UserRole, MenuItem[]> = {
   [UserRole.RESIDENT]: [
     { icon: '📊', label: 'Dashboard' },
     { icon: '📅', label: 'My Schedule' },
+    { icon: '🗺️', label: 'Map Explorer' },
     { icon: '📜', label: 'History' },
     { icon: '🌿', label: 'Waste Tips' },
     { icon: '⚙️', label: 'Settings' },

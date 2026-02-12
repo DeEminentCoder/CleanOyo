@@ -21,6 +21,12 @@ export enum WasteType {
   CONSTRUCTION = 'Construction/Bulky'
 }
 
+export enum Priority {
+  LOW = 'Low',
+  MEDIUM = 'Medium',
+  HIGH = 'High'
+}
+
 export interface Coordinates {
   lat: number;
   lng: number;
@@ -33,18 +39,11 @@ export interface User {
   phone: string;
   role: UserRole;
   location: string;
+  preferredPspId?: string; // ID of the chosen Waste Collection Operator
   avatar?: string; // Base64 image data
   availability?: boolean; // For PSP Operators
   password?: string; // Hashed in real backend
-}
-
-export interface PSPOperatorProfile {
-  userId: string;
-  serviceZone: string;
-  availability: boolean;
-  fleetSize: number;
-  efficiency: number;
-  assignedSubZones: string[];
+  coordinates?: Coordinates; // For map placement
 }
 
 export interface PickupRequest {
@@ -53,9 +52,14 @@ export interface PickupRequest {
   residentName: string;
   operatorId?: string;
   operatorName?: string;
-  location: string;
+  location: string; // The general area/zone
+  houseNumber: string;
+  streetName: string;
+  landmark: string;
+  contactPhone: string;
   coordinates?: Coordinates;
   wasteType: WasteType;
+  priority: Priority;
   scheduledDate: string;
   status: PickupStatus;
   notes?: string;
@@ -63,11 +67,14 @@ export interface PickupRequest {
   updatedAt: string;
 }
 
-export interface Zone {
+export interface NotificationRecord {
   id: string;
-  name: string;
-  boundaries: Coordinates[];
-  assignedOperators: string[]; // User IDs
+  userId: string; // Recipient
+  type: string;
+  message: string;
+  timestamp: string;
+  medium: 'SMS' | 'EMAIL' | 'SYSTEM';
+  isRead: boolean;
 }
 
 export interface ActivityLog {

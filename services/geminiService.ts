@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { WasteType } from "../types";
 
@@ -127,9 +128,14 @@ export const generateSmsContent = async (type: 'REMINDER' | 'STATUS_UPDATE' | 'C
   }
 };
 
-export const generateEmailContent = async (type: 'PASSWORD_RESET', data: any) => {
+export const generateEmailContent = async (type: 'PASSWORD_RESET' | 'PICKUP_CONFIRMATION', data: any) => {
   try {
-    const prompt = `Generate a warm email for a password reset for Waste Up Ibadan. Recipient: ${data.name}.`;
+    let prompt = "";
+    if (type === 'PASSWORD_RESET') {
+      prompt = `Generate a warm, professional email message for a password reset for a Waste Up Ibadan user named ${data.name}. (Limit: 50 words)`;
+    } else {
+      prompt = `Generate a confirmation email message for a ${data.wasteType} pickup request in Ibadan for ${data.name}. Location: ${data.location}. Mention 'Waste Up Ibadan' and 'Clean Oyo'. (Limit: 60 words)`;
+    }
     
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -137,9 +143,12 @@ export const generateEmailContent = async (type: 'PASSWORD_RESET', data: any) =>
       config: { temperature: 0.6 }
     });
     // Fix: Access text property directly
-    return response.text || "Hello, please use the link in the app to reset your Waste Up Ibadan password.";
+    return response.text || (type === 'PASSWORD_RESET' ? "Hello, please use the link in the app to reset your password." : "Your pickup request has been received. Thank you!");
   } catch (error) {
-    return `Hello ${data.name || 'Citizen'}, you requested a password reset for your Waste Up Ibadan account. Please visit the portal to continue.`;
+    if (type === 'PASSWORD_RESET') {
+      return `Hello ${data.name || 'Citizen'}, you requested a password reset for your Waste Up Ibadan account. Please visit the portal to continue.`;
+    }
+    return `Hello ${data.name || 'Citizen'}, your ${data.wasteType || 'waste'} pickup at ${data.location || 'your address'} has been confirmed. Clean Oyo!`;
   }
 };
 

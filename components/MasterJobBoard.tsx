@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { PickupRequest, PickupStatus, WasteType } from '../types';
-import { STATUS_COLORS, WASTE_ICONS } from '../constants';
+import { STATUS_COLORS, WASTE_ICONS, PRIORITY_COLORS } from '../constants';
 
 export const MasterJobBoard: React.FC<{ requests: PickupRequest[] }> = ({ requests }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,6 +56,7 @@ export const MasterJobBoard: React.FC<{ requests: PickupRequest[] }> = ({ reques
                 <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest">Resident</th>
                 <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest">Location</th>
                 <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest">Category</th>
+                <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest">Priority</th>
                 <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest">PSP Assigned</th>
                 <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest">Status</th>
               </tr>
@@ -65,23 +66,28 @@ export const MasterJobBoard: React.FC<{ requests: PickupRequest[] }> = ({ reques
                 <tr key={req.id} className="hover:bg-slate-50 transition-colors group">
                   <td className="p-4 text-xs font-mono text-slate-400">#{req.id.slice(-6)}</td>
                   <td className="p-4">
-                    <p className="font-bold text-slate-800">{req.residentName}</p>
+                    <p className="font-bold text-slate-800 text-sm">{req.residentName}</p>
                     <p className="text-[10px] text-slate-500">Created: {new Date(req.createdAt).toLocaleDateString()}</p>
                   </td>
                   <td className="p-4">
-                    <p className="text-sm text-slate-600">{req.location}</p>
+                    <p className="text-xs text-slate-600 truncate max-w-[120px]">{req.location}</p>
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                       <span>{WASTE_ICONS[req.wasteType]}</span>
+                       <span className="text-lg">{WASTE_ICONS[req.wasteType]}</span>
                        <span className="text-xs text-slate-600">{req.wasteType.split(' ')[0]}</span>
                     </div>
+                  </td>
+                  <td className="p-4">
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest ${PRIORITY_COLORS[req.priority]}`}>
+                      {req.priority}
+                    </span>
                   </td>
                   <td className="p-4">
                     <span className="text-xs font-bold text-emerald-600">{req.operatorName || 'Unassigned'}</span>
                   </td>
                   <td className="p-4">
-                    <span className={`text-[10px] font-black px-2 py-1 rounded-full ${STATUS_COLORS[req.status]}`}>
+                    <span className={`text-[10px] font-black px-2 py-1 rounded-full border uppercase tracking-widest ${STATUS_COLORS[req.status]}`}>
                       {req.status}
                     </span>
                   </td>
