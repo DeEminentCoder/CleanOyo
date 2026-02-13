@@ -3,13 +3,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Waste Up (Clean Oyo Scheduler)</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#059669">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WasteUp">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1152/1152912.png">
+    <meta name="description" content="A comprehensive waste management and scheduling platform for Ibadan, Oyo State.">
+    <meta name="mobile-web-app-capable" content="yes">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <!-- Leaflet Map Library -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
     <script>
       tailwind.config = {
         darkMode: 'class',
@@ -32,7 +45,10 @@
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc;
             transition: background-color 0.2s ease, color 0.2s ease;
-            font-size: 0.875rem; /* Standardizing for professional look */
+            font-size: 0.875rem; 
+            overflow-x: hidden; /* Prevent horizontal scroll */
+            width: 100%;
+            touch-action: manipulation; /* Improved touch handling */
         }
         .dark body {
             background-color: #020617;
@@ -45,6 +61,18 @@
         .leaflet-control-zoom {
             border: none !important;
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
+        }
+        /* Mobile-friendly scrollbars */
+        ::-webkit-scrollbar {
+          width: 4px;
+          height: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 10px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+          background: #334155;
         }
     </style>
 <script type="importmap">
