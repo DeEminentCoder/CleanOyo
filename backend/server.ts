@@ -15,7 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'wasteup_secret_key_ibadan';
 const SYSTEM_EMAIL = process.env.SYSTEM_EMAIL || "simeonkenny66@gmail.com";
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://simeonkennycleanoyo_db_user:simeonkenny0810@cluster0.gynk5eu.mongodb.net/CleanOyo?retryWrites=true&w=majority&appName=Cluster0';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://simeonkennycleanoyo_db_user:simeonkenny0810@cluster0.pgnr6i5.mongodb.net/cleanoyo?appName=Cluster0';
 
 // Middleware
 app.use(cors() as any);
