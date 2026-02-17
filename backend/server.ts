@@ -1,3 +1,4 @@
+
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -13,20 +14,36 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'wasteup_secret_key_ibadan';
-const SYSTEM_EMAIL = "simeonkenny66@gmail.com";
+const SYSTEM_EMAIL = process.env.SYSTEM_EMAIL || "simeonkenny66@gmail.com";
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://simeonkennycleanoyo_db_user:simeonkenny0810@cluster0.gynk5eu.mongodb.net/CleanOyo?retryWrites=true&w=majority&appName=Cluster0';
 
-// Fix: Cast middleware to any to resolve PathParams type mismatch error in TypeScript
+// Middleware
 app.use(cors() as any);
 app.use(express.json() as any);
 
 // --- Database Connection ---
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/wasteup_db')
+console.log('🔄 Initiating connection to MongoDB Atlas...');
+
+mongoose.connect(MONGO_URI)
   .then(async () => {
-    console.log('MongoDB connected to Waste Up Atlas cluster');
-    // Run seed logic
+    console.log('✅ SUCCESS: Connected to MongoDB Atlas - Database: CleanOyo');
+    // Run seed and test logic
     await seedData();
   })
-  .catch(err => console.error('MongoDB connection error:', err));
+  .catch(err => {
+    console.error('❌ ERROR: Could not connect to MongoDB Atlas:', err.message);
+    // Fix: Cast process to any to access exit property if types are missing in the current execution context
+    (process as any).exit(1);
+  });
+
+// Handle connection events
+mongoose.connection.on('error', err => {
+  console.error('📡 MongoDB Connection Error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.warn('📡 MongoDB Disconnected. Attempting to reconnect...');
+});
 
 // --- Middleware ---
 const authenticate = (req: any, res: any, next: any) => {
@@ -80,7 +97,6 @@ app.post('/api/users/login', async (req, res) => {
     if (!user) return res.status(404).json({ message: 'Account not found' });
     if (user.role !== role) return res.status(403).json({ message: 'Role mismatch' });
 
-    // For demo, we might skip full bcrypt check if password is not provided or hardcoded
     const valid = await bcrypt.compare(password || 'password123', user.passwordHash);
     if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
 
@@ -180,6 +196,6 @@ app.get('/api/activitylogs', authenticate, authorize(['admin']), async (req, res
 
 // Start Server
 app.listen(PORT, () => {
-  console.log(`Waste Up Backend running on port ${PORT}`);
-  console.log(`System contact notifications configured for: ${SYSTEM_EMAIL}`);
+  console.log(`🚀 Waste Up Backend running on port ${PORT}`);
+  console.log(`📧 System notifications configured for: ${SYSTEM_EMAIL}`);
 });

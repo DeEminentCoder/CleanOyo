@@ -6,14 +6,23 @@ import { UserModel, ZoneModel, PSPOperatorModel, PickupRequestModel } from './mo
 
 export const seedData = async () => {
   try {
-    // Check if database is already seeded
-    const userCount = await UserModel.countDocuments();
-    if (userCount > 0) {
-      console.log('[SEED] Database already has data. Skipping seed.');
+    console.log('[SEED] Verifying database integrity on Atlas...');
+
+    // Count existing documents for verification
+    const counts = {
+      users: await UserModel.countDocuments(),
+      zones: await ZoneModel.countDocuments(),
+      requests: await PickupRequestModel.countDocuments()
+    };
+
+    console.log(`[SEED] Current Atlas Data: ${counts.users} Users, ${counts.zones} Zones, ${counts.requests} Requests`);
+
+    if (counts.users > 0) {
+      console.log('[SEED] Data already exists. Skipping initial population.');
       return;
     }
 
-    console.log('[SEED] Starting database seeding for Ibadan Pilot...');
+    console.log('[SEED] Starting initial population for CleanOyo database...');
 
     // 1. Create Admin
     const adminPassword = await bcrypt.hash('admin123', 10);
@@ -26,6 +35,7 @@ export const seedData = async () => {
       location: 'Dugbe'
     });
     await admin.save();
+    console.log('✅ Created Admin Account');
 
     // 2. Create Zones
     const zones = [
@@ -41,6 +51,7 @@ export const seedData = async () => {
         boundaries: { type: 'Polygon', coordinates: z.coordinates }
       }).save();
     }
+    console.log(`✅ Created ${zones.length} Zones`);
 
     // 3. Create PSP Operators
     const pspPassword = await bcrypt.hash('psp123', 10);
@@ -54,6 +65,7 @@ export const seedData = async () => {
     });
     await psp1.save();
     await new PSPOperatorModel({ userId: psp1._id, serviceZone: 'Bodija', fleetSize: 12, efficiency: 94 }).save();
+    console.log('✅ Created Initial PSP Profile');
 
     // 4. Create Residents
     const resPassword = await bcrypt.hash('res123', 10);
@@ -66,6 +78,7 @@ export const seedData = async () => {
       location: 'Bodija'
     });
     await res1.save();
+    console.log('✅ Created Initial Resident Account');
 
     // 5. Create Sample Pickup Request
     await new PickupRequestModel({
@@ -76,11 +89,12 @@ export const seedData = async () => {
       wasteType: 'General Household',
       scheduledDate: new Date(),
       status: 'Scheduled',
-      notes: 'Pilot request'
+      notes: 'Initial seed request for Atlas testing'
     }).save();
+    console.log('✅ Created Sample Pickup Document');
 
-    console.log('[SEED] Database seeding completed successfully.');
+    console.log('[SEED] Seeding successfully confirmed on MongoDB Atlas.');
   } catch (error) {
-    console.error('[SEED ERROR]', error);
+    console.error('[SEED ERROR] Failed to populate Atlas:', error);
   }
 };

@@ -1,119 +1,123 @@
-
 import mongoose, { Schema, Document } from 'mongoose';
 
-// --- User Schema ---
+// User Model
+export enum UserRole {
+    RESIDENT = 'RESIDENT',
+    PSP_OPERATOR = 'PSP_OPERATOR',
+    ADMIN = 'ADMIN'
+}
+
 export interface IUser extends Document {
   name: string;
   email: string;
-  phone: string;
-  role: 'resident' | 'psp' | 'admin';
+  role: UserRole;
   passwordHash: string;
-  location: string;
-  avatar?: string;
-  createdAt: Date;
+  location?: string;
+  operatorId?: string;
+  zone?: string;
 }
 
-const UserSchema = new Schema<IUser>({
+const userSchema: Schema = new Schema({
   name: { type: String, required: true },
-  email: { type: String, required: true, unique: true, lowercase: true },
-  phone: { type: String, required: true },
-  role: { type: String, enum: ['resident', 'psp', 'admin'], default: 'resident' },
+  email: { type: String, required: true, unique: true },
+  role: { type: String, enum: Object.values(UserRole), required: true },
   passwordHash: { type: String, required: true },
-  location: { type: String, default: 'Bodija' },
-  avatar: { type: String },
-  createdAt: { type: Date, default: Date.now }
-});
+  location: { type: String },
+  operatorId: { type: String },
+  zone: { type: String },
+}, { timestamps: true });
 
-// --- PSP Operator Schema ---
-export interface IPSPOperator extends Document {
-  userId: mongoose.Types.ObjectId;
-  serviceZone: string;
-  availability: boolean;
-  fleetSize: number;
-  efficiency: number;
-  assignedSubZones: string[];
+export const UserModel = mongoose.model<IUser>('User', userSchema);
+
+
+// PickupRequest Model
+export enum PickupStatus {
+  PENDING = 'PENDING',
+  SCHEDULED = 'SCHEDULED',
+  ON_THE_WAY = 'ON_THE_WAY',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED'
 }
 
-const PSPOperatorSchema = new Schema<IPSPOperator>({
-  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  serviceZone: { type: String, required: true },
-  availability: { type: Boolean, default: true },
-  fleetSize: { type: Number, default: 0 },
-  efficiency: { type: Number, default: 0 },
-  assignedSubZones: [{ type: String }]
-});
-
-// --- Pickup Request Schema ---
 export interface IPickupRequest extends Document {
-  residentId: mongoose.Types.ObjectId;
-  operatorId?: mongoose.Types.ObjectId;
-  residentName: string;
-  location: string;
-  gps?: { lat: number; lng: number };
+  resident: mongoose.Schema.Types.ObjectId;
+  pspOperator?: mongoose.Schema.Types.ObjectId;
   wasteType: string;
+  status: PickupStatus;
   scheduledDate: Date;
-  status: 'Pending' | 'Scheduled' | 'On The Way' | 'Completed' | 'Cancelled';
+  location: {
+    type: { type: String, enum: ['Point'], required: true },
+    coordinates: { type: [Number], required: true }
+  };
   notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
-const PickupRequestSchema = new Schema<IPickupRequest>({
-  residentId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  operatorId: { type: Schema.Types.ObjectId, ref: 'User' }, // Ref to User (PSP Role)
-  residentName: { type: String, required: true },
-  location: { type: String, required: true },
-  gps: {
-    lat: { type: Number },
-    lng: { type: Number }
-  },
+const pickupRequestSchema: Schema = new Schema({
+  resident: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  pspOperator: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   wasteType: { type: String, required: true },
+  status: { type: String, enum: Object.values(PickupStatus), default: PickupStatus.PENDING },
   scheduledDate: { type: Date, required: true },
-  status: { 
-    type: String, 
-    enum: ['Pending', 'Scheduled', 'On The Way', 'Completed', 'Cancelled'], 
-    default: 'Pending' 
+  location: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      required: true
+    },
+    coordinates: {
+      type: [Number],
+      required: true
+    }
   },
   notes: { type: String },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
+}, { timestamps: true });
 
-// --- Zone Schema ---
+pickupRequestSchema.index({ location: '2dsphere' });
+
+export const PickupRequestModel = mongoose.model<IPickupRequest>('PickupRequest', pickupRequestSchema);
+
+
+// Zone Model
 export interface IZone extends Document {
   name: string;
-  boundaries: { type: string, coordinates: number[][][] }; // GeoJSON
-  assignedOperators: mongoose.Types.ObjectId[];
   floodRisk: 'Low' | 'Medium' | 'High';
+  activeRequests: number;
+  coordinates: [number, number];
 }
 
-const ZoneSchema = new Schema<IZone>({
+const zoneSchema: Schema = new Schema({
   name: { type: String, required: true, unique: true },
-  boundaries: {
-    type: { type: String, enum: ['Polygon'], required: true },
-    coordinates: { type: [[[Number]]], required: true }
-  },
-  assignedOperators: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-  floodRisk: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Low' }
-});
+  floodRisk: { type: String, enum: ['Low', 'Medium', 'High'], required: true },
+  activeRequests: { type: Number, default: 0 },
+  coordinates: { type: [Number], required: true },
+}, { timestamps: true });
 
-// --- Activity Log Schema ---
-export interface IActivityLog extends Document {
-  userId: mongoose.Types.ObjectId;
-  action: string;
-  details: string;
-  timestamp: Date;
+export const ZoneModel = mongoose.model<IZone>('Zone', zoneSchema);
+
+// PSPOperator Model
+export interface IPSPOperator extends Document {
+    userId: mongoose.Schema.Types.ObjectId;
+    serviceZone: string;
 }
 
-const ActivityLogSchema = new Schema<IActivityLog>({
-  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  action: { type: String, required: true },
-  details: { type: String },
-  timestamp: { type: Date, default: Date.now }
-});
+const pspOperatorSchema: Schema = new Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    serviceZone: { type: String, required: true },
+}, { timestamps: true });
 
-export const UserModel = mongoose.model<IUser>('User', UserSchema);
-export const PSPOperatorModel = mongoose.model<IPSPOperator>('PSPOperator', PSPOperatorSchema);
-export const PickupRequestModel = mongoose.model<IPickupRequest>('PickupRequest', PickupRequestSchema);
-export const ZoneModel = mongoose.model<IZone>('Zone', ZoneSchema);
-export const ActivityLogModel = mongoose.model<IActivityLog>('ActivityLog', ActivityLogSchema);
+export const PSPOperatorModel = mongoose.model<IPSPOperator>('PSPOperator', pspOperatorSchema);
+
+// ActivityLog Model
+export interface IActivityLog extends Document {
+    userId: mongoose.Schema.Types.ObjectId;
+    action: string;
+    details: string;
+}
+
+const activityLogSchema: Schema = new Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    action: { type: String, required: true },
+    details: { type: String, required: true },
+}, { timestamps: true });
+
+export const ActivityLogModel = mongoose.model<IActivityLog>('ActivityLog', activityLogSchema);
