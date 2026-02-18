@@ -124,11 +124,10 @@ export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
     }
   };
 
-  // const sortedItems = useMemo(() => {
-  //   const list = isResident ? allPsps : requests.filter(r => r.status !== PickupStatus.COMPLETED);
-  //   if (!isResident && optimization) return optimization.optimizedOrder.map(idx => (list as PickupRequest[])[idx]).filter(Boolean);
-  //   return list;
-  // }, [allPsps, requests, optimization, isResident]);
+  const sortedItems = useMemo(() => {
+    const list = isResident ? allPsps : requests.filter(r => r.status !== PickupStatus.COMPLETED);
+    return list;
+  }, [allPsps, requests, isResident]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden gap-3">
