@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { User, PickupRequest, PickupStatus, UserRole } from '../types';
 import { IBADAN_ZONES } from '../constants';
-import { getRouteOptimizationAdvice, RouteOptimizationResult } from '../services/geminiService';
+// import { getRouteOptimizationAdvice, RouteOptimizationResult } from '../services/geminiService';
 import { apiService } from '../services/apiService';
 
 declare const L: any;
@@ -19,7 +19,7 @@ export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
   const markersRef = useRef<any[]>([]);
 
   const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [optimization, setOptimization] = useState<RouteOptimizationResult | null>(null);
+  // const [optimization, setOptimization] = useState<RouteOptimizationResult | null>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isUpdatingUser, setIsUpdatingUser] = useState(false);
   const [allPsps, setAllPsps] = useState<User[]>([]);
@@ -73,7 +73,7 @@ export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
       const activePickups = requests.filter(r => r.status !== PickupStatus.COMPLETED && r.status !== PickupStatus.CANCELLED);
       activePickups.forEach((req, idx) => {
         if (!req.coordinates) return;
-        const stopOrder = optimization ? optimization.optimizedOrder.indexOf(idx) + 1 : null;
+        const stopOrder = null; // optimization ? optimization.optimizedOrder.indexOf(idx) + 1 : null;
         const pinIcon = L.divIcon({
           html: `<div class="w-8 h-8 rounded-full border-2 border-white shadow-md flex items-center justify-center text-[10px] font-black text-white ${req.status === PickupStatus.SCHEDULED ? 'bg-blue-500' : 'bg-orange-500'}">${stopOrder || '📍'}</div>`,
           className: 'custom-div-icon', iconSize: [32, 32], iconAnchor: [16, 16]
@@ -83,29 +83,29 @@ export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
         markersRef.current.push(marker);
       });
 
-      if (optimization && activePickups.length > 1) {
-        const pathPoints = optimization.optimizedOrder
-          .map(idx => activePickups[idx])
-          .filter(r => r && r.coordinates)
-          .map(r => [r.coordinates!.lat, r.coordinates!.lng]);
-        polylineRef.current = L.polyline(pathPoints, { color: '#10b981', weight: 4, opacity: 0.6, dashArray: '8, 8' }).addTo(mapRef.current);
-      }
+      // if (optimization && activePickups.length > 1) {
+      //   const pathPoints = optimization.optimizedOrder
+      //     .map(idx => activePickups[idx])
+      //     .filter(r => r && r.coordinates)
+      //     .map(r => [r.coordinates!.lat, r.coordinates!.lng]);
+      //   polylineRef.current = L.polyline(pathPoints, { color: '#10b981', weight: 4, opacity: 0.6, dashArray: '8, 8' }).addTo(mapRef.current);
+      // }
     }
-  }, [allPsps, requests, optimization, isResident, user]);
+  }, [allPsps, requests, isResident, user]);
 
-  const handleOptimizeRoute = async () => {
-    const active = requests.filter(r => r.status !== PickupStatus.COMPLETED);
-    if (active.length < 2) return;
-    setIsOptimizing(true);
-    try {
-      const result = await getRouteOptimizationAdvice(active.map(r => `${r.houseNumber} ${r.streetName}, ${r.location}`));
-      setOptimization(result);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsOptimizing(false);
-    }
-  };
+  // const handleOptimizeRoute = async () => {
+  //   const active = requests.filter(r => r.status !== PickupStatus.COMPLETED);
+  //   if (active.length < 2) return;
+  //   setIsOptimizing(true);
+  //   try {
+  //     const result = await getRouteOptimizationAdvice(active.map(r => `${r.houseNumber} ${r.streetName}, ${r.location}`));
+  //     setOptimization(result);
+  //   } catch (e) {
+  //     console.error(e);
+  //   } finally {
+  //     setIsOptimizing(false);
+  //   }
+  // };
 
   const handleLaunchNavigator = () => {
     if (!selectedItem || !selectedItem.coordinates) return;
@@ -124,11 +124,11 @@ export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
     }
   };
 
-  const sortedItems = useMemo(() => {
-    const list = isResident ? allPsps : requests.filter(r => r.status !== PickupStatus.COMPLETED);
-    if (!isResident && optimization) return optimization.optimizedOrder.map(idx => (list as PickupRequest[])[idx]).filter(Boolean);
-    return list;
-  }, [allPsps, requests, optimization, isResident]);
+  // const sortedItems = useMemo(() => {
+  //   const list = isResident ? allPsps : requests.filter(r => r.status !== PickupStatus.COMPLETED);
+  //   if (!isResident && optimization) return optimization.optimizedOrder.map(idx => (list as PickupRequest[])[idx]).filter(Boolean);
+  //   return list;
+  // }, [allPsps, requests, optimization, isResident]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden gap-3">
@@ -138,7 +138,7 @@ export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
           <p className="text-[10px] text-slate-500">{isResident ? 'Find and partner with verified PSP operators.' : 'Efficiently manage your collection route.'}</p>
         </div>
         <div className="flex gap-1.5">
-          {!isResident && (
+          {/* {!isResident && (
             <button 
               onClick={handleOptimizeRoute}
               disabled={isOptimizing || requests.filter(r => r.status !== PickupStatus.COMPLETED).length < 2}
@@ -146,7 +146,7 @@ export const FullMapView: React.FC<FullMapViewProps> = ({ user, requests }) => {
             >
               {isOptimizing ? '🤖 Optimizing...' : '✨ AI Optimize'}
             </button>
-          )}
+          )} */}
           <button 
             onClick={() => mapRef.current?.flyTo([user.coordinates?.lat || 7.3775, user.coordinates?.lng || 3.9470], 15)} 
             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-600 dark:text-slate-400"
