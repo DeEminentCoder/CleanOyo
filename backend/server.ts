@@ -219,10 +219,10 @@ app.get('/api/activitylogs', authenticate, authorize(['admin']), async (req: Req
   res.json(logs);
 });
 
-import { GoogleAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // --- AI Service Proxy ---
-const genAI = new GoogleAI(process.env.GOOGLE_API_KEY || '');
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 
 app.post('/api/ai/waste-tips', authenticate, async (req, res) => {
     try {

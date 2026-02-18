@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:frontend && npm run build:backend",   
+    "build": "npm run build:frontend && npm run build:backend",
     "build:frontend": "vite build",
     "build:backend": "tsc",
     "preview": "vite preview",
@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.40.0",
+    "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
