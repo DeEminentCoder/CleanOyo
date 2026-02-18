@@ -2,7 +2,7 @@
 // backend/seed.ts
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { UserModel, ZoneModel, PSPOperatorModel, PickupRequestModel } from './models';
+import { UserModel, ZoneModel, PSPOperatorModel, PickupRequestModel, UserRole } from './models.js';
 
 export const seedData = async () => {
   try {
@@ -30,7 +30,7 @@ export const seedData = async () => {
       name: 'Oyo State Admin',
       email: 'simeonkenny66@gmail.com',
       phone: '08000000001',
-      role: 'admin',
+      role: UserRole.ADMIN,
       passwordHash: adminPassword,
       location: 'Dugbe'
     });
@@ -44,11 +44,11 @@ export const seedData = async () => {
       { name: 'Challenge', floodRisk: 'High', coordinates: [[[3.87, 7.34], [3.88, 7.34], [3.88, 7.35], [3.87, 7.35], [3.87, 7.34]]] },
     ];
 
-    for (const z of zones) {
+    for (const zone of zones) {
       await new ZoneModel({
-        name: z.name,
-        floodRisk: z.floodRisk,
-        boundaries: { type: 'Polygon', coordinates: z.coordinates }
+        name: zone.name,
+        floodRisk: zone.floodRisk,
+        boundaries: { type: 'Polygon', coordinates: zone.coordinates }
       }).save();
     }
     console.log(`✅ Created ${zones.length} Zones`);
@@ -59,7 +59,7 @@ export const seedData = async () => {
       name: 'CleanOyo Ltd',
       email: 'ops@cleanoyo.ng',
       phone: '08023456789',
-      role: 'psp',
+      role: UserRole.PSP_OPERATOR,
       passwordHash: pspPassword,
       location: 'Bodija'
     });
@@ -73,7 +73,7 @@ export const seedData = async () => {
       name: 'Ayo Balogun',
       email: 'ayo@mail.ng',
       phone: '08012345678',
-      role: 'resident',
+      role: UserRole.RESIDENT,
       passwordHash: resPassword,
       location: 'Bodija'
     });

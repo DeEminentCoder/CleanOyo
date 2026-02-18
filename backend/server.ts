@@ -5,9 +5,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { UserModel, PickupRequestModel, PSPOperatorModel, ZoneModel, ActivityLogModel } from './models';
-import { sendPickupNotification } from './mailer';
-import { seedData } from './seed';
+import { UserModel, PickupRequestModel, PSPOperatorModel, ZoneModel, ActivityLogModel } from './models.js';
+import { sendPickupNotification, sendVerificationEmail } from './mailer.js';
+import { seedData } from './seed.js';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -45,20 +46,22 @@ mongoose.connection.on('disconnected', () => {
   console.warn('📡 MongoDB Disconnected. Attempting to reconnect...');
 });
 
+import { Request, Response, NextFunction } from 'express';
+
 // --- Middleware ---
-const authenticate = (req: any, res: any, next: any) => {
+const authenticate = (req: Request, res: Response, next: NextFunction) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ message: 'No token provided' });
 
   jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
     if (err) return res.status(403).json({ message: 'Invalid token' });
-    req.user = decoded;
+    (req as any).user = decoded;
     next();
   });
 };
 
-const authorize = (roles: string[]) => (req: any, res: any, next: any) => {
-  if (!roles.includes(req.user.role)) {
+const authorize = (roles: string[]) => (req: Request, res: Response, next: NextFunction) => {
+  if (!roles.includes((req as any).user.role)) {
     return res.status(403).json({ message: 'Access denied for this role' });
   }
   next();
@@ -67,14 +70,15 @@ const authorize = (roles: string[]) => (req: any, res: any, next: any) => {
 // --- Routes ---
 
 // 1. Auth: Register
-app.post('/api/users/register', async (req, res) => {
+app.post('/api/users/register', async (req: Request, res: Response) => {
   try {
     const { name, email, phone, role, password, location } = req.body;
     const existing = await UserModel.findOne({ email });
     if (existing) return res.status(400).json({ message: 'User already exists' });
 
     const passwordHash = await bcrypt.hash(password || 'password123', 10);
-    const user = new UserModel({ name, email, phone, role, passwordHash, location });
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const user = new UserModel({ name, email, phone, role, passwordHash, location, verificationToken });
     await user.save();
 
     if (role === 'psp') {
@@ -82,37 +86,58 @@ app.post('/api/users/register', async (req, res) => {
       await pspProfile.save();
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role, email: user.email, name: user.name, location: user.location, phone: user.phone }, JWT_SECRET, { expiresIn: '24h' });
-    res.status(201).json({ user, token });
+    await sendVerificationEmail(user.email, user.name, verificationToken);
+
+    res.status(201).json({ message: 'User registered successfully. Please check your email to verify your account.' });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
 });
 
-// 2. Auth: Login
-app.post('/api/users/login', async (req, res) => {
+// 2. Auth: Verify Email
+app.get('/api/users/verify', async (req: Request, res: Response) => {
+    try {
+        const { token } = req.query;
+        if (!token) return res.status(400).send('Verification token is required.');
+
+        const user = await UserModel.findOne({ verificationToken: token as string });
+        if (!user) return res.status(400).send('Invalid verification token.');
+
+        user.isVerified = true;
+        user.verificationToken = undefined;
+        await user.save();
+
+        res.send('Email verified successfully. You can now log in.');
+    } catch (error: any) {
+        res.status(500).send('Error verifying email.');
+    }
+});
+
+// 3. Auth: Login
+app.post('/api/users/login', async (req: Request, res: Response) => {
   try {
     const { email, password, role } = req.body;
     const user = await UserModel.findOne({ email });
     if (!user) return res.status(404).json({ message: 'Account not found' });
+    if (!user.isVerified) return res.status(401).json({ message: 'Please verify your email before logging in.' });
     if (user.role !== role) return res.status(403).json({ message: 'Role mismatch' });
 
     const valid = await bcrypt.compare(password || 'password123', user.passwordHash);
     if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
 
-    const token = jwt.sign({ id: user._id, role: user.role, email: user.email, name: user.name, location: user.location, phone: user.phone }, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ id: user._id, role: user.role, email: user.email, name: user.name, location: user.location }, JWT_SECRET, { expiresIn: '24h' });
     res.json({ user, token });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
 });
 
-// 3. Pickup Requests
-app.get('/api/pickuprequests', authenticate, async (req: any, res) => {
+// 4. Pickup Requests
+app.get('/api/pickuprequests', authenticate, async (req: Request, res: Response) => {
   try {
     let query = {};
-    if (req.user.role === 'resident') query = { residentId: req.user.id };
-    else if (req.user.role === 'psp') query = { operatorId: req.user.id };
+    if ((req as any).user.role === 'resident') query = { residentId: (req as any).user.id };
+    else if ((req as any).user.role === 'psp') query = { operatorId: (req as any).user.id };
 
     const requests = await PickupRequestModel.find(query).sort({ createdAt: -1 });
     res.json(requests);
@@ -121,16 +146,16 @@ app.get('/api/pickuprequests', authenticate, async (req: any, res) => {
   }
 });
 
-app.post('/api/pickuprequests', authenticate, authorize(['resident']), async (req: any, res) => {
+app.post('/api/pickuprequests', authenticate, authorize(['resident']), async (req: Request, res: Response) => {
   try {
-    const user = await UserModel.findById(req.user.id);
+    const user = await UserModel.findById((req as any).user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const pspUser = await UserModel.findOne({ role: 'psp', location: user.location });
 
     const newRequest = new PickupRequestModel({
       ...req.body,
-      residentId: user._id,
+      resident: user._id,
       residentName: user.name,
       operatorId: pspUser?._id,
       status: 'Pending'
@@ -142,7 +167,7 @@ app.post('/api/pickuprequests', authenticate, authorize(['resident']), async (re
       status: 'Pending (Received)',
       wasteType: newRequest.wasteType,
       scheduledDate: newRequest.scheduledDate,
-      location: newRequest.location
+      location: newRequest.location.toString()
     });
 
     await new ActivityLogModel({ userId: user._id, action: 'CREATE_REQUEST', details: `New ${req.body.wasteType} request created.` }).save();
@@ -153,20 +178,20 @@ app.post('/api/pickuprequests', authenticate, authorize(['resident']), async (re
   }
 });
 
-app.put('/api/pickuprequests/:id', authenticate, async (req: any, res) => {
+app.put('/api/pickuprequests/:id', authenticate, async (req: Request, res: Response) => {
   try {
     const updated = await PickupRequestModel.findByIdAndUpdate(req.params.id, { 
       status: req.body.status, 
       updatedAt: new Date() 
-    }, { new: true }).populate('residentId');
+    }, { new: true }).populate('resident');
     
-    if (updated && updated.residentId) {
-      const resUser = updated.residentId as any;
+    if (updated && updated.resident) {
+      const resUser = updated.resident as any;
       await sendPickupNotification(resUser.email, resUser.name, {
         status: updated.status,
         wasteType: updated.wasteType,
         scheduledDate: updated.scheduledDate,
-        location: updated.location
+        location: updated.location.toString()
       });
     }
 
@@ -177,25 +202,29 @@ app.put('/api/pickuprequests/:id', authenticate, async (req: any, res) => {
 });
 
 // 4. Admin: Zones
-app.get('/api/zones', async (req, res) => {
+app.get('/api/zones', async (req: Request, res: Response) => {
   const zones = await ZoneModel.find();
   res.json(zones);
 });
 
-app.post('/api/zones', authenticate, authorize(['admin']), async (req, res) => {
+app.post('/api/zones', authenticate, authorize(['admin']), async (req: Request, res: Response) => {
   const zone = new ZoneModel(req.body);
   await zone.save();
   res.status(201).json(zone);
 });
 
 // 5. Activity Logs (Admin only)
-app.get('/api/activitylogs', authenticate, authorize(['admin']), async (req, res) => {
+app.get('/api/activitylogs', authenticate, authorize(['admin']), async (req: Request, res: Response) => {
   const logs = await ActivityLogModel.find().populate('userId', 'name email').sort({ timestamp: -1 });
   res.json(logs);
 });
 
 // Start Server
-app.listen(PORT, () => {
-  console.log(`🚀 Waste Up Backend running on port ${PORT}`);
-  console.log(`📧 System notifications configured for: ${SYSTEM_EMAIL}`);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Waste Up Backend running on port ${PORT}`);
+    console.log(`📧 System notifications configured for: ${SYSTEM_EMAIL}`);
+  });
+}
+
+export default app;

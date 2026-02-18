@@ -14,7 +14,14 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export const sendPickupNotification = async (email: string, name: string, details: any) => {
+interface PickupDetails {
+  status: string;
+  wasteType: string;
+  scheduledDate: string | Date;
+  location: string;
+}
+
+export const sendPickupNotification = async (email: string, name: string, details: PickupDetails) => {
   const mailOptions = {
     from: `"Waste Up Ibadan" <${SYSTEM_EMAIL}>`,
     to: email,
@@ -45,6 +52,39 @@ export const sendPickupNotification = async (email: string, name: string, detail
     }
     await transporter.sendMail(mailOptions);
     console.log(`[MAILER] Notification sent to ${email}`);
+  } catch (error) {
+    console.error('[MAILER ERROR]', error);
+  }
+};
+
+export const sendVerificationEmail = async (email: string, name: string, token: string) => {
+  const verificationLink = `http://localhost:5000/api/users/verify?token=${token}`;
+  const mailOptions = {
+    from: `"Waste Up Ibadan" <${SYSTEM_EMAIL}>`,
+    to: email,
+    subject: 'Verify Your Email for Waste Up',
+    html: `
+      <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
+        <h2 style="color: #10b981;">🌱 Welcome to Waste Up Ibadan</h2>
+        <p>Hello <strong>${name}</strong>,</p>
+        <p>Thank you for registering. Please click the link below to verify your email address:</p>
+        <div style="text-align: center; margin: 20px 0;">
+          <a href="${verificationLink}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Verify Email</a>
+        </div>
+        <p>If you did not create an account, please ignore this email.</p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #64748b;">This is an automated message from the Oyo State Waste Management Authority pilot system.</p>
+      </div>
+    `,
+  };
+
+  try {
+    if (EMAIL_PASS === 'mock_password') {
+      console.log(`[MAILER MOCK] Sending verification email to ${email} with link: ${verificationLink}`);
+      return;
+    }
+    await transporter.sendMail(mailOptions);
+    console.log(`[MAILER] Verification email sent to ${email}`);
   } catch (error) {
     console.error('[MAILER ERROR]', error);
   }

@@ -15,6 +15,8 @@ export interface IUser extends Document {
   location?: string;
   operatorId?: string;
   zone?: string;
+  isVerified: boolean;
+  verificationToken?: string;
 }
 
 const userSchema: Schema = new Schema({
@@ -25,6 +27,8 @@ const userSchema: Schema = new Schema({
   location: { type: String },
   operatorId: { type: String },
   zone: { type: String },
+  isVerified: { type: Boolean, default: false },
+  verificationToken: { type: String },
 }, { timestamps: true });
 
 export const UserModel = mongoose.model<IUser>('User', userSchema);
