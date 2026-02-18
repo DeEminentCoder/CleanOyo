@@ -78,17 +78,16 @@ export const analyzeWasteImage = async (base64Image: string) => {
 
 export const generateSmsContent = async (type: 'REMINDER' | 'STATUS_UPDATE' | 'CONFIRMATION', data: any) => {
   try {
-    const prompt = `Generate a short, professional SMS notification (max 140 chars) for a waste management app in Ibadan. 
-    Context: ${type}. Details: ${JSON.stringify(data)}. 
-    Include 'Waste Up Ibadan'.`;
-    
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: { temperature: 0.5 }
+    const response = await fetch('/api/ai/generate-sms', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ type, data })
     });
-    // Fix: Access text property directly
-    return response.text?.trim() || `Waste Up Ibadan: Your ${data.wasteType || 'pickup'} status is now ${data.status}. Thank you!`;
+    const result = await response.json();
+    return result.content || `Waste Up Ibadan: Your ${data.wasteType || 'pickup'} status is now ${data.status}. Thank you!`;
   } catch (error) {
     const status = data.status || 'updated';
     return `Waste Up Ibadan: Your pickup status has been ${status.toLowerCase()}. Thank you for helping us keep Oyo clean.`;
@@ -97,67 +96,20 @@ export const generateSmsContent = async (type: 'REMINDER' | 'STATUS_UPDATE' | 'C
 
 export const generateEmailContent = async (type: 'PASSWORD_RESET' | 'PICKUP_CONFIRMATION', data: any) => {
   try {
-    let prompt = "";
-    if (type === 'PASSWORD_RESET') {
-      prompt = `Generate a warm, professional email message for a password reset for a Waste Up Ibadan user named ${data.name}. (Limit: 50 words)`;
-    } else {
-      prompt = `Generate a confirmation email message for a ${data.wasteType} pickup request in Ibadan for ${data.name}. Location: ${data.location}. Mention 'Waste Up Ibadan' and 'Clean Oyo'. (Limit: 60 words)`;
-    }
-    
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: { temperature: 0.6 }
+    const response = await fetch('/api/ai/generate-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ type, data })
     });
-    // Fix: Access text property directly
-    return response.text || (type === 'PASSWORD_RESET' ? "Hello, please use the link in the app to reset your password." : "Your pickup request has been received. Thank you!");
+    const result = await response.json();
+    return result.content || (type === 'PASSWORD_RESET' ? "Hello, please use the link in the app to reset your password." : "Your pickup request has been received. Thank you!");
   } catch (error) {
     if (type === 'PASSWORD_RESET') {
       return `Hello ${data.name || 'Citizen'}, you requested a password reset for your Waste Up Ibadan account. Please visit the portal to continue.`;
     }
     return `Hello ${data.name || 'Citizen'}, your ${data.wasteType || 'waste'} pickup at ${data.location || 'your address'} has been confirmed. Clean Oyo!`;
-  }
-};
-
-export interface RouteOptimizationResult {
-  optimizedOrder: number[];
-  justification: string;
-}
-
-export const getRouteOptimizationAdvice = async (locations: string[]): Promise<RouteOptimizationResult> => {
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Suggest an efficient waste collection route for the following locations in Ibadan, Nigeria: ${locations.map((l, i) => `${i}: ${l}`).join(', ')}. 
-      Consider traffic patterns in areas like Challenge, Dugbe, and Iwo Road. 
-      Return the optimized order by their original index.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            optimizedOrder: {
-              type: Type.ARRAY,
-              items: { type: Type.INTEGER },
-              description: "The sequence of original indices representing the most efficient path."
-            },
-            justification: {
-              type: Type.STRING,
-              description: "A short explanation of why this route was chosen (e.g. avoiding Dugbe traffic)."
-            }
-          },
-          required: ["optimizedOrder", "justification"]
-        }
-      }
-    });
-    
-    // Fix: Access text property directly
-    return JSON.parse(response.text || '{}');
-  } catch (error) {
-    console.error("AI Route Optimization failed, using simple sequential fallback", error);
-    return {
-      optimizedOrder: locations.map((_, i) => i),
-      justification: "Standard sequential route. (AI optimization currently limited or unavailable)"
-    };
   }
 };

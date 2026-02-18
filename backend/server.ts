@@ -219,10 +219,10 @@ app.get('/api/activitylogs', authenticate, authorize(['admin']), async (req: Req
   res.json(logs);
 });
 
-import { GoogleGenerativeAI } from '@google/genai';
+import { GoogleAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 
 // --- AI Service Proxy ---
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
+const genAI = new GoogleAI(process.env.GOOGLE_API_KEY || '');
 
 app.post('/api/ai/waste-tips', authenticate, async (req, res) => {
     try {
@@ -255,6 +255,57 @@ app.post('/api/ai/analyze-image', authenticate, async (req, res) => {
         res.json(JSON.parse(text));
     } catch (error) {
         res.status(500).json({ message: 'Failed to analyze waste image.' });
+    }
+});
+
+app.post('/api/ai/generate-sms', authenticate, async (req, res) => {
+    try {
+        const { type, data } = req.body;
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const prompt = `Generate a short, professional SMS notification (max 140 chars) for a waste management app in Ibadan. 
+    Context: ${type}. Details: ${JSON.stringify(data)}. 
+    Include 'Waste Up Ibadan'.`;
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        res.json({ content: text });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to generate SMS content.' });
+    }
+});
+
+app.post('/api/ai/generate-email', authenticate, async (req, res) => {
+    try {
+        const { type, data } = req.body;
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        let prompt = "";
+        if (type === 'PASSWORD_RESET') {
+            prompt = `Generate a warm, professional email message for a password reset for a Waste Up Ibadan user named ${data.name}. (Limit: 50 words)`;
+        } else {
+            prompt = `Generate a confirmation email message for a ${data.wasteType} pickup request in Ibadan for ${data.name}. Location: ${data.location}. Mention 'Waste Up Ibadan' and 'Clean Oyo'. (Limit: 60 words)`;
+        }
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        res.json({ content: text });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to generate email content.' });
+    }
+});
+
+app.post('/api/ai/optimize-route', authenticate, async (req, res) => {
+    try {
+        const { locations } = req.body;
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const prompt = `Suggest an efficient waste collection route for the following locations in Ibadan, Nigeria: ${locations.map((l: any, i: number) => `${i}: ${l}`).join(', ')}. 
+      Consider traffic patterns in areas like Challenge, Dugbe, and Iwo Road. 
+      Return the optimized order by their original index.`;
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        res.json(JSON.parse(text));
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to optimize route.' });
     }
 });
 
