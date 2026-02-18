@@ -1,11 +1,6 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
 import { WasteType } from "../types";
 
-// Fix: Use process.env.API_KEY directly and ensure named parameter initialization
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-// Local Knowledge Base for Ibadan Waste Management
 const LOCAL_TIPS: Record<string, string[]> = {
   [WasteType.GENERAL]: [
     "Ensure your bin is tightly covered to prevent scavengers from scattering waste into gutters.",
@@ -40,19 +35,18 @@ export const getWasteManagementTips = async (wasteType: string) => {
   if (tipCache[wasteType]) return tipCache[wasteType];
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Provide 1 short, actionable tip for residents in Ibadan, Nigeria to better manage ${wasteType} waste to prevent drainage blockage and flooding. Keep it friendly and localized. (Limit: 30 words)`,
-      config: {
-        temperature: 0.7,
+    const response = await fetch('/api/ai/waste-tips', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
       },
+      body: JSON.stringify({ wasteType })
     });
-    
-    // Fix: Access response.text property directly
-    const text = response.text?.trim();
-    if (text) {
-      tipCache[wasteType] = text;
-      return text;
+    const data = await response.json();
+    if (data.tip) {
+      tipCache[wasteType] = data.tip;
+      return data.tip;
     }
     throw new Error("Empty response");
   } catch (error: any) {
@@ -67,42 +61,15 @@ export const getWasteManagementTips = async (wasteType: string) => {
 
 export const analyzeWasteImage = async (base64Image: string) => {
   try {
-    // Fix: Use contents: { parts: [...] } structure for sending images and text together
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: 'image/jpeg',
-              data: base64Image.split(',')[1] || base64Image,
-            },
-          },
-          {
-            text: `Identify the waste in this image. Provide:
-            1. Waste Category (General, Recyclable, Organic, Hazardous, Construction).
-            2. Specific disposal advice for a resident in Ibadan.
-            3. Environmental impact if dumped illegally in a gutter.
-            Return in JSON format.`,
-          },
-        ]
+    const response = await fetch('/api/ai/analyze-image', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
       },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            category: { type: Type.STRING },
-            advice: { type: Type.STRING },
-            impact: { type: Type.STRING }
-          },
-          required: ["category", "advice", "impact"]
-        }
-      }
+      body: JSON.stringify({ image: base64Image.split(',')[1] || base64Image })
     });
-
-    // Fix: Access text property directly
-    return JSON.parse(response.text || '{}');
+    return await response.json();
   } catch (error) {
     console.error("AI Analysis failed:", error);
     throw error;

@@ -219,6 +219,45 @@ app.get('/api/activitylogs', authenticate, authorize(['admin']), async (req: Req
   res.json(logs);
 });
 
+import { GoogleGenerativeAI } from '@google/genai';
+
+// --- AI Service Proxy ---
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
+
+app.post('/api/ai/waste-tips', authenticate, async (req, res) => {
+    try {
+        const { wasteType } = req.body;
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const prompt = `Provide 1 short, actionable tip for residents in Ibadan, Nigeria to better manage ${wasteType} waste to prevent drainage blockage and flooding. Keep it friendly and localized. (Limit: 30 words)`;
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        res.json({ tip: text });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to generate waste management tips.' });
+    }
+});
+
+app.post('/api/ai/analyze-image', authenticate, async (req, res) => {
+    try {
+        const { image } = req.body; // base64 encoded image
+        const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" });
+        const prompt = "Identify the waste in this image. Provide: 1. Waste Category (General, Recyclable, Organic, Hazardous, Construction). 2. Specific disposal advice for a resident in Ibadan. 3. Environmental impact if dumped illegally in a gutter. Return in JSON format.";
+        const imagePart = {
+            inlineData: {
+                data: image,
+                mimeType: "image/jpeg"
+            }
+        };
+        const result = await model.generateContent([prompt, imagePart]);
+        const response = await result.response;
+        const text = response.text();
+        res.json(JSON.parse(text));
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to analyze waste image.' });
+    }
+});
+
 // Start Server
 if (import.meta.url === `file://${process.argv[1]}`) {
   app.listen(PORT, () => {
