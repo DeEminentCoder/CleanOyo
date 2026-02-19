@@ -114,11 +114,10 @@ const App: React.FC = () => {
 
   const handleRegister = async (details: { name: string; email: string; phone: string; role: UserRole; location?: string; password?: string }) => {
     try {
-      await authService.register(details);
-      // After successful registration, the user will be on the login page
-      // and can now sign in with their new credentials.
+      const { user: registeredUser } = await authService.register(details);
+      setUser(registeredUser);
+      setActiveTab(ROLE_DEFAULT_TABS[details.role]);
     } catch (error: any) {
-      console.error("Registration failed:", error);
       throw error;
     }
   };
@@ -243,7 +242,7 @@ const App: React.FC = () => {
         <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-right-10 fade-in duration-300">
           <div className={`bg-slate-900 dark:bg-slate-800 text-white p-4 rounded-2xl shadow-2xl border ${activeNotification.medium === 'SMS' ? 'border-emerald-700' : 'border-blue-700'} max-w-sm flex gap-4`}>
             <div className={`w-10 h-10 ${activeNotification.medium === 'SMS' ? 'bg-emerald-600' : 'bg-blue-600'} rounded-full flex items-center justify-center text-xl shrink-0`}>
-              {activeNotification.medium === 'SMS' ? 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â±' : 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â°ÃƒÂ¯Ã‚Â¸Ã‚Â'}
+              {activeNotification.medium === 'SMS' ? 'Ã°Å¸â€œÂ±' : 'Ã¢Å“â€°Ã¯Â¸Â'}
             </div>
             <div>
               <p className={`text-[10px] font-black uppercase ${activeNotification.medium === 'SMS' ? 'text-emerald-400' : 'text-blue-400'} tracking-widest mb-1`}>

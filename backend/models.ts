@@ -10,7 +10,6 @@ export enum UserRole {
 export interface IUser extends Document {
   name: string;
   email: string;
-  phone?: string;
   role: UserRole;
   passwordHash: string;
   location?: string;
@@ -23,7 +22,6 @@ export interface IUser extends Document {
 const userSchema: Schema = new Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
-  phone: { type: String },
   role: { type: String, enum: Object.values(UserRole), required: true },
   passwordHash: { type: String, required: true },
   location: { type: String },
