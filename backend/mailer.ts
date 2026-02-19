@@ -4,7 +4,7 @@ import nodemailer from 'nodemailer';
 
 const SYSTEM_EMAIL = "simeonkenny66@gmail.com";
 // In a real app, EMAIL_PASS would be a Google App Password
-const EMAIL_PASS = process.env.EMAIL_PASS || 'mock_password'; 
+const EMAIL_PASS = process.env.EMAIL_PASS; 
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -44,10 +44,10 @@ export const sendPickupNotification = async (email: string, name: string, detail
     `,
   };
 
-  try {
-    // In demo mode, we just log instead of actually attempting a send if credentials aren't set
-    if (EMAIL_PASS === 'mock_password') {
-      console.log(`[MAILER MOCK] Sending email to ${email} regarding status ${details.status}`);
+ try {
+    // Only attempt to send if email credentials are provided
+    if (!SYSTEM_EMAIL || !EMAIL_PASS) {
+      console.log(`[MAILER] Email credentials not set. Skipping email to ${email}.`);
       return;
     }
     await transporter.sendMail(mailOptions);
@@ -79,8 +79,9 @@ export const sendVerificationEmail = async (email: string, name: string, token: 
   };
 
   try {
-    if (EMAIL_PASS === 'mock_password') {
-      console.log(`[MAILER MOCK] Sending verification email to ${email} with link: ${verificationLink}`);
+    // Only attempt to send if email credentials are provided
+    if (!SYSTEM_EMAIL || !EMAIL_PASS) {
+      console.log(`[MAILER] Email credentials not set. Skipping verification email to ${email}.`);
       return;
     }
     await transporter.sendMail(mailOptions);
