@@ -7,12 +7,11 @@ interface LoginProps {
   onLogin: (email: string, role: UserRole, password?: string) => Promise<void>;
   onRegister: (details: { name: string; email: string; phone: string; role: UserRole; location?: string; password?: string }) => Promise<void>;
   onForgotPassword: (email: string) => Promise<void>;
-  registrationMessage?: string | null;
 }
 
 type AuthView = 'login' | 'register' | 'forgot';
 
-export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassword, registrationMessage }) => {
+export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassword }) => {
   const [view, setView] = useState<AuthView>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,14 +31,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
     setError(null);
     setIsResetSent(false);
   }, [view, selectedRole]);
-
-  // Effect to handle successful registration
-  useEffect(() => {
-    if (registrationMessage) {
-      setView('login'); // Switch to login view to show the message
-      setIsLoading(false); // Ensure loading is off
-    }
-  }, [registrationMessage]);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,12 +115,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
         {isResetSent && (
           <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl text-[10px] font-bold mb-4 border border-emerald-100 dark:border-emerald-900/30">
             ✅ Reset instructions sent to your email.
-          </div>
-        )}
-
-        {registrationMessage && view === 'login' && (
-          <div className="p-3 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl text-xs font-bold mb-4 border border-green-100 dark:border-green-900/30">
-            ✅ {registrationMessage}
           </div>
         )}
 

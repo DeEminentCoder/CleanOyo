@@ -37,7 +37,6 @@ const App: React.FC = () => {
   const [requests, setRequests] = useState<PickupRequest[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [theme, setTheme] = useState<string>(localStorage.getItem('waste_up_theme') || 'light');
-  const [registrationMessage, setRegistrationMessage] = useState<string | null>(null);
 
   // Handle Theme
   useEffect(() => {
@@ -80,6 +79,7 @@ const App: React.FC = () => {
 
   // Startup: Initialize session
   useEffect(() => {
+    apiService.seedDatabase();
     const initialize = async () => {
       const currentUser = authService.getCurrentUser();
       if (currentUser) {
@@ -107,7 +107,6 @@ const App: React.FC = () => {
       const { user: loggedInUser } = await authService.login(email, selectedRole, password);
       setUser(loggedInUser);
       setActiveTab(ROLE_DEFAULT_TABS[selectedRole]);
-      setRegistrationMessage(null); // Clear registration message on successful login
     } catch (error: any) {
       throw error;
     }
@@ -115,11 +114,10 @@ const App: React.FC = () => {
 
   const handleRegister = async (details: { name: string; email: string; phone: string; role: UserRole; location?: string; password?: string }) => {
     try {
-      const { message } = await authService.register(details);
-      setRegistrationMessage(message); // Set the registration message
+      const { user: registeredUser } = await authService.register(details);
+      setUser(registeredUser);
+      setActiveTab(ROLE_DEFAULT_TABS[details.role]);
     } catch (error: any) {
-      // Clear the message on error, and re-throw to be handled by the form
-      setRegistrationMessage(null);
       throw error;
     }
   };
@@ -210,7 +208,7 @@ const App: React.FC = () => {
   };
 
   if (isInitializing) return <div className="min-h-screen flex items-center justify-center bg-emerald-50 dark:bg-slate-900 font-bold text-emerald-800 animate-pulse transition-colors duration-300">Initializing Waste Up Ibadan Portal...</div>;
-  if (!user) return <Login onLogin={handleLogin} onRegister={handleRegister} onForgotPassword={handleForgotPassword} registrationMessage={registrationMessage} />;
+  if (!user) return <Login onLogin={handleLogin} onRegister={handleRegister} onForgotPassword={handleForgotPassword} />;
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden relative transition-colors duration-300">
@@ -244,7 +242,7 @@ const App: React.FC = () => {
         <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-right-10 fade-in duration-300">
           <div className={`bg-slate-900 dark:bg-slate-800 text-white p-4 rounded-2xl shadow-2xl border ${activeNotification.medium === 'SMS' ? 'border-emerald-700' : 'border-blue-700'} max-w-sm flex gap-4`}>
             <div className={`w-10 h-10 ${activeNotification.medium === 'SMS' ? 'bg-emerald-600' : 'bg-blue-600'} rounded-full flex items-center justify-center text-xl shrink-0`}>
-              {activeNotification.medium === 'SMS' ? 'ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â±' : 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â'}
+              {activeNotification.medium === 'SMS' ? 'ðŸ“±' : 'âœ‰ï¸'}
             </div>
             <div>
               <p className={`text-[10px] font-black uppercase ${activeNotification.medium === 'SMS' ? 'text-emerald-400' : 'text-blue-400'} tracking-widest mb-1`}>

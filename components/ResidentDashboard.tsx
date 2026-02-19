@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { User, PickupRequest, WasteType, PickupStatus, Priority, Coordinates, UserRole } from '../types';
 import { STATUS_COLORS, WASTE_ICONS, PRIORITY_COLORS } from '../constants';
 import { getWasteManagementTips } from '../services/geminiService';
-import { apiService } from '../services/apiService';
 import { WasteScanner } from './WasteScanner';
+import { apiService } from '../services/apiService';
 
 interface ResidentDashboardProps {
   user: User;

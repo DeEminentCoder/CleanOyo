@@ -10,13 +10,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "ts-node": {
-    "compilerOptions": {
-      "module": "CommonJS"
-    },
-    "esm": true,
-    "experimentalSpecifierResolution": "node"
-  },
   "include": ["backend/**/*.ts"],
   "exclude": ["node_modules"]
 }
