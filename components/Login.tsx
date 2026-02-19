@@ -79,7 +79,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
         <div className="text-center mb-6">
           <div className="w-10 h-10 bg-emerald-600 rounded-xl shadow-lg shadow-emerald-200 dark:shadow-none mx-auto flex items-center justify-center text-xl mb-3">🌱</div>
           <h1 className="text-lg font-bold text-slate-900 dark:text-white">Waste Up Ibadan</h1>
-          <p className="text-slate-400 text-[10px] mt-0.5 uppercase tracking-widest font-black">Clean Oyoo0o Initiative</p>
+          <p className="text-slate-400 text-[10px] mt-0.5 uppercase tracking-widest font-black">Clean Oyo Initiative</p>
         </div>
 
         {/* View Toggles */}
