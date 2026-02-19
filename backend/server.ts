@@ -70,7 +70,7 @@ const authorize = (roles: string[]) => (req: Request, res: Response, next: NextF
 // --- Routes ---
 
 // 1. Auth: Register
-app.post('/api/users/register', async (req: Request, res: Response) => {
+app.post('/api/auth/register', async (req: Request, res: Response) => {
   try {
     const { name, email, phone, role, password, location } = req.body;
     const existing = await UserModel.findOne({ email });
