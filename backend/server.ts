@@ -310,7 +310,7 @@ app.post('/api/ai/optimize-route', authenticate, async (req, res) => {
 });
 
 // Start Server
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     console.log(`🚀 Waste Up Backend running on port ${PORT}`);
     console.log(`📧 System notifications configured for: ${SYSTEM_EMAIL}`);
