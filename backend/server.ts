@@ -86,10 +86,11 @@ app.post('/api/users/register', async (req: Request, res: Response) => {
       await pspProfile.save();
     }
 
-    await sendVerificationEmail(user.email, user.name, verificationToken);
+    // await sendVerificationEmail(user.email, user.name, verificationToken);
 
     res.status(201).json({ message: 'User registered successfully. Please check your email to verify your account.' });
   } catch (error: any) {
+    console.error('REGISTRATION ERROR:', error);
     res.status(500).json({ message: error.message });
   }
 });

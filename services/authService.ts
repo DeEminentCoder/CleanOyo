@@ -45,18 +45,19 @@ export const authService = {
     return { user, token };
   },
 
-  register: async (details: { name: string; email: string; phone: string; role: UserRole; location?: string; password?: string }): Promise<{ user: User; token: string }> => {
+  register: async (details: { name: string; email: string; phone: string; role: UserRole; location?: string; password?: string }): Promise<void> => {
     const response = await fetch('/api/users/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(details),
     });
-    const data = await response.json();
+
     if (!response.ok) {
-      throw new Error(data.message || 'Registration failed');
+      // Try to get a more specific error message from the backend if possible
+      const errorData = await response.json().catch(() => null); // Avoid crashing if the body is not JSON
+      throw new Error(errorData?.message || `Registration failed with status: ${response.status}`);
     }
-    localStorage.setItem(TOKEN_KEY, data.token);
-    return data;
+    // No need to process the response body for a successful registration
   },
 
   updateToken: (user: User) => {
