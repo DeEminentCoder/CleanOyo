@@ -96,7 +96,7 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
                     _id: user._id,
                     name: user.name,
                     email: user.email,
-                    phone: user.phone,
+                    phone: (user as any).phone,
                     role: user.role,
                     location: user.location,
                     isVerified: user.isVerified,
@@ -128,7 +128,7 @@ app.get('/api/users/verify', async (req: Request, res: Response) => {
 });
 
 // 3. Auth: Login
-app.post('/api/auth/login', async (req: Request, res: Response) => {
+app.post('/auth/login', async (req: Request, res: Response) => {
   try {
     const { email, password, role } = req.body;
     const user = await UserModel.findOne({ email });
