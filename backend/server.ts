@@ -18,24 +18,22 @@ const JWT_SECRET = process.env.JWT_SECRET || 'wasteup_secret_key_ibadan';
 const SYSTEM_EMAIL = process.env.SYSTEM_EMAIL || "simeonkenny66@gmail.com";
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://simeonkennycleanoyo_db_user:simeonkenny0810@cluster0.pgnr6i5.mongodb.net/cleanoyo?appName=Cluster0';
 
-// Middleware
-app.use(cors() as any);
-app.use(express.json() as any);
-
-// --- Database Connection ---
-console.log('🔄 Initiating connection to MongoDB Atlas...');
-
-mongoose.connect(MONGO_URI)
-  .then(async () => {
+// --- Database Connection Function ---
+const connectDB = async () => {
+  try {
+    console.log('🔄 Initiating connection to MongoDB Atlas...');
+    await mongoose.connect(MONGO_URI);
     console.log('✅ SUCCESS: Connected to MongoDB Atlas - Database: CleanOyo');
-    // Run seed and test logic
     await seedData();
-  })
-  .catch(err => {
+  } catch (err: any) {
     console.error('❌ ERROR: Could not connect to MongoDB Atlas:', err.message);
-    // Fix: Cast process to any to access exit property if types are missing in the current execution context
-    (process as any).exit(1);
-  });
+    process.exit(1);
+  }
+};
+
+// Middleware
+app.use(cors());
+app.use(express.json());
 
 // Handle connection events
 mongoose.connection.on('error', err => {
@@ -122,6 +120,9 @@ app.post('/api/users/login', async (req: Request, res: Response) => {
     if (!user.isVerified) return res.status(401).json({ message: 'Please verify your email before logging in.' });
     if (user.role !== role) return res.status(403).json({ message: 'Role mismatch' });
 
+    if (!user.passwordHash) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
     const valid = await bcrypt.compare(password || 'password123', user.passwordHash);
     if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
 
@@ -205,6 +206,11 @@ app.put('/api/pickuprequests/:id', authenticate, async (req: Request, res: Respo
 app.get('/api/zones', async (req: Request, res: Response) => {
   const zones = await ZoneModel.find();
   res.json(zones);
+});
+
+app.get('/api/users', async (req: Request, res: Response) => {
+  const users = await UserModel.find();
+  res.json(users);
 });
 
 app.post('/api/zones', authenticate, authorize(['admin']), async (req: Request, res: Response) => {
@@ -310,11 +316,14 @@ app.post('/api/ai/optimize-route', authenticate, async (req, res) => {
 });
 
 // Start Server
-if (import.meta.url === `file://${process.argv[1]}`) {
+const startServer = async () => {
+  await connectDB();
   app.listen(PORT, () => {
     console.log(`🚀 Waste Up Backend running on port ${PORT}`);
     console.log(`📧 System notifications configured for: ${SYSTEM_EMAIL}`);
   });
-}
+};
+
+startServer();
 
 export default app;

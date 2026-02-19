@@ -24,48 +24,35 @@ const decodeJWT = (token: string): any => {
 
 export const authService = {
   login: async (email: string, role: UserRole, password?: string): Promise<{ user: User; token: string }> => {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    const user = apiService.getUserByEmail(email.trim());
+    const response = await fetch('/api/users/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, role }),
+    });
 
-    if (!user) {
-      throw new Error(`Account not found: "${email}". Please Register first.`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Login failed');
     }
 
-    if (user.role !== role) {
-      throw new Error(`Authentication Mismatch: This account is registered as ${user.role}.`);
-    }
-
-    // Verify Password
-    if (password && user.password && user.password !== password) {
-      throw new Error("Invalid password. Please check your credentials and try again.");
-    }
-
-    const token = generateMockJWT(user);
+    const { user, token } = await response.json();
     localStorage.setItem(TOKEN_KEY, token);
     return { user, token };
   },
 
-  register: async (details: { name: string; email: string; phone: string; role: UserRole; location?: string; password?: string }): Promise<{ user: User; token: string }> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const existing = apiService.getUserByEmail(details.email.trim());
-    if (existing) {
-      throw new Error(`Account for "${details.email}" already exists.`);
+  register: async (details: { name: string; email: string; phone: string; role: UserRole; location?: string; password?: string }): Promise<{ message: string }> => {
+    const response = await fetch('/api/users/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(details),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Registration failed');
     }
 
-    const user: User = {
-      id: `user-${Date.now()}`,
-      name: details.name.trim(),
-      email: details.email.trim().toLowerCase(),
-      phone: details.phone.trim(),
-      role: details.role,
-      location: details.location || 'Bodija',
-      password: details.password // Store password for mock verification
-    };
-
-    apiService.saveUser(user);
-    const token = generateMockJWT(user);
-    localStorage.setItem(TOKEN_KEY, token);
-    return { user, token };
+    return await response.json();
   },
 
   updateToken: (user: User) => {
