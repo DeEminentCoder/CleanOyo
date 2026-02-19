@@ -88,7 +88,21 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
 
     await sendVerificationEmail(user.email, user.name, verificationToken);
 
-    res.status(201).json({ message: 'User registered successfully. Please check your email to verify your account.' });
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'your_jwt_secret', { expiresIn: '1h' });
+
+            res.status(201).json({ 
+                message: 'User registered successfully. Please check your email to verify your account.',
+                user: {
+                    _id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    phone: user.phone,
+                    role: user.role,
+                    location: user.location,
+                    isVerified: user.isVerified,
+                },
+                token 
+            });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -114,7 +128,7 @@ app.get('/api/users/verify', async (req: Request, res: Response) => {
 });
 
 // 3. Auth: Login
-app.post('/api/users/login', async (req: Request, res: Response) => {
+app.post('/api/auth/login', async (req: Request, res: Response) => {
   try {
     const { email, password, role } = req.body;
     const user = await UserModel.findOne({ email });
@@ -310,7 +324,7 @@ app.post('/api/ai/optimize-route', authenticate, async (req, res) => {
 });
 
 // Start Server
-if (process.env.NODE_ENV !== 'test') {
+if (import.meta.url === `file://${process.argv[1]}`) {
   app.listen(PORT, () => {
     console.log(`🚀 Waste Up Backend running on port ${PORT}`);
     console.log(`📧 System notifications configured for: ${SYSTEM_EMAIL}`);
