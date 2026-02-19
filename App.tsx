@@ -79,7 +79,7 @@ const App: React.FC = () => {
 
   // Startup: Initialize session
   useEffect(() => {
-    
+    apiService.seedDatabase();
     const initialize = async () => {
       const currentUser = authService.getCurrentUser();
       if (currentUser) {

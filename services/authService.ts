@@ -79,3 +79,10 @@ export const authService = {
 
   getToken: () => localStorage.getItem(TOKEN_KEY)
 };
+
+function generateMockJWT(user: User): string {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payload = btoa(JSON.stringify({ ...user, exp: Date.now() + 3600000 }));
+  const signature = btoa('mock-signature');
+  return `${header}.${payload}.${signature}`;
+}
