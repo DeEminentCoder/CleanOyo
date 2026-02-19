@@ -46,26 +46,17 @@ export const authService = {
   },
 
   register: async (details: { name: string; email: string; phone: string; role: UserRole; location?: string; password?: string }): Promise<{ user: User; token: string }> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const existing = apiService.getUserByEmail(details.email.trim());
-    if (existing) {
-      throw new Error(`Account for "${details.email}" already exists.`);
+    const response = await fetch('/api/users/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(details),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Registration failed');
     }
-
-    const user: User = {
-      id: `user-${Date.now()}`,
-      name: details.name.trim(),
-      email: details.email.trim().toLowerCase(),
-      phone: details.phone.trim(),
-      role: details.role,
-      location: details.location || 'Bodija',
-      password: details.password // Store password for mock verification
-    };
-
-    apiService.saveUser(user);
-    const token = generateMockJWT(user);
-    localStorage.setItem(TOKEN_KEY, token);
-    return { user, token };
+    localStorage.setItem(TOKEN_KEY, data.token);
+    return data;
   },
 
   updateToken: (user: User) => {
