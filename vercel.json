@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "comment": "Force rebuild to fix import issue",
   "builds": [
     {
       "src": "api/index.ts",
