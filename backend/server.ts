@@ -330,11 +330,13 @@ app.post('/api/ai/optimize-route', authenticate, async (req, res) => {
     }
 });
 
-// --- Server Listener (for local development) ---
+// --- Server Listener ---
+// This block is for local development. It will not run in production environments like Vercel.
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
   });
 }
 
+// Export the app instance for serverless environments or testing
 export default app;
