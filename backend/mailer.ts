@@ -58,7 +58,8 @@ export const sendPickupNotification = async (email: string, name: string, detail
 };
 
 export const sendVerificationEmail = async (email: string, name: string, token: string) => {
-  const verificationLink = `http://localhost:5000/api/users/verify?token=${token}`;
+  const BASE_URL = process.env.NODE_ENV === 'production' ? process.env.URL : 'http://localhost:5000';
+  const verificationLink = `${BASE_URL}/api/users/verify?token=${token}`;
   const mailOptions = {
     from: `"Waste Up Ibadan" <${SYSTEM_EMAIL}>`,
     to: email,
