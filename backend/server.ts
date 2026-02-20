@@ -70,7 +70,7 @@ const authorize = (roles: string[]) => (req: Request, res: Response, next: NextF
 // --- Routes ---
 
 // 1. Auth: Register
-app.post('/api/auth/register', async (req: Request, res: Response) => {
+app.post('/api/users/register', async (req: Request, res: Response) => {
   try {
     const { name, email, phone, role, password, location } = req.body;
     const existing = await UserModel.findOne({ email });
@@ -88,21 +88,7 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
 
     await sendVerificationEmail(user.email, user.name, verificationToken);
 
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'your_jwt_secret', { expiresIn: '1h' });
-
-            res.status(201).json({ 
-                message: 'User registered successfully. Please check your email to verify your account.',
-                user: {
-                    _id: user._id,
-                    name: user.name,
-                    email: user.email,
-                    phone: (user as any).phone,
-                    role: user.role,
-                    location: user.location,
-                    isVerified: user.isVerified,
-                },
-                token 
-            });
+    res.status(201).json({ message: 'User registered successfully. Please check your email to verify your account.' });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }
@@ -128,12 +114,12 @@ app.get('/api/users/verify', async (req: Request, res: Response) => {
 });
 
 // 3. Auth: Login
-app.post('/api/auth/login', async (req: Request, res: Response) => {
+app.post('/api/users/login', async (req: Request, res: Response) => {
   try {
     const { email, password, role } = req.body;
     const user = await UserModel.findOne({ email });
     if (!user) return res.status(404).json({ message: 'Account not found' });
-    // if (!user.isVerified) return res.status(401).json({ message: 'Please verify your email before logging in.' });
+    if (!user.isVerified) return res.status(401).json({ message: 'Please verify your email before logging in.' });
     if (user.role !== role) return res.status(403).json({ message: 'Role mismatch' });
 
     const valid = await bcrypt.compare(password || 'password123', user.passwordHash);
@@ -238,7 +224,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // --- AI Service Proxy ---
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 
-app.post('/api/ai/waste-tips', authenticate, async (req: Request, res: Response) => {
+app.post('/api/ai/waste-tips', authenticate, async (req, res) => {
     try {
         const { wasteType } = req.body;
         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
@@ -313,30 +299,22 @@ app.post('/api/ai/optimize-route', authenticate, async (req, res) => {
         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
         const prompt = `Suggest an efficient waste collection route for the following locations in Ibadan, Nigeria: ${locations.map((l: any, i: number) => `${i}: ${l}`).join(', ')}. 
       Consider traffic patterns in areas like Challenge, Dugbe, and Iwo Road. 
-      Return the optimized order as a JSON array of the original indices. For example: [2, 0, 1].`;
+      Return the optimized order by their original index.`;
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
-        try {
-            // AI might wrap the response in markdown, so we clean it up.
-            const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-            res.json(JSON.parse(cleanedText));
-        } catch (parseError) {
-            console.error("AI response parsing error:", parseError);
-            res.status(500).json({ message: 'Failed to parse optimized route from AI response.', raw_response: text });
-        }
+        res.json(JSON.parse(text));
     } catch (error) {
         res.status(500).json({ message: 'Failed to optimize route.' });
     }
 });
 
-// --- Server Listener ---
-// This block is for local development. It will not run in production environments like Vercel.
-if (process.env.NODE_ENV !== 'production') {
+// Start Server
+if (import.meta.url === `file://${process.argv[1]}`) {
   app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Waste Up Backend running on port ${PORT}`);
+    console.log(`📧 System notifications configured for: ${SYSTEM_EMAIL}`);
   });
 }
 
-// Export the app instance for serverless environments or testing
 export default app;

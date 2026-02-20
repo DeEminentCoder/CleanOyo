@@ -119,7 +119,7 @@ const App: React.FC = () => {
       setActiveTab('login');
       setUser(null); 
       // Optionally, display a success message to the user
-      // alert('Registration successful! Please log in.');
+      alert('Registration successful! Please log in.');
     } catch (error: any) {
       throw error;
     }

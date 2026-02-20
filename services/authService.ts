@@ -4,7 +4,14 @@ import { notificationService } from './notificationService';
 import { apiService } from './apiService';
 
 const TOKEN_KEY = 'waste_up_auth_token';
+const JWT_SECRET = 'wasteup_secret_key_ibadan';
 
+const generateMockJWT = (user: User) => {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payload = btoa(JSON.stringify({ ...user, exp: Date.now() + 3600000 }));
+  const signature = 'mock_signature';
+  return `${header}.${payload}.${signature}`;
+};
 
 const decodeJWT = (token: string): any => {
   try {
@@ -17,31 +24,46 @@ const decodeJWT = (token: string): any => {
 
 export const authService = {
   login: async (email: string, role: UserRole, password?: string): Promise<{ user: User; token: string }> => {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, role }),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Login failed');
+    await new Promise(resolve => setTimeout(resolve, 800));
+    const user = apiService.getUserByEmail(email.trim());
+
+    if (!user) {
+      throw new Error(`Account not found: "${email}". Please Register first.`);
     }
-    const { user, token } = await response.json();
+
+    if (user.role !== role) {
+      throw new Error(`Authentication Mismatch: This account is registered as ${user.role}.`);
+    }
+
+    // Verify Password
+    if (password && user.password && user.password !== password) {
+      throw new Error("Invalid password. Please check your credentials and try again.");
+    }
+
+    const token = generateMockJWT(user);
     localStorage.setItem(TOKEN_KEY, token);
     return { user, token };
   },
 
   register: async (details: { name: string; email: string; phone: string; role: UserRole; location?: string; password?: string }): Promise<{ user: User; token: string }> => {
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(details),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Registration failed');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const existing = apiService.getUserByEmail(details.email.trim());
+    if (existing) {
+      throw new Error(`Account for "${details.email}" already exists.`);
     }
-    const { user, token } = await response.json();
+
+    const user: User = {
+      id: `user-${Date.now()}`,
+      name: details.name.trim(),
+      email: details.email.trim().toLowerCase(),
+      phone: details.phone.trim(),
+      role: details.role,
+      location: details.location || 'Bodija',
+      password: details.password // Store password for mock verification
+    };
+
+    apiService.saveUser(user);
+    const token = generateMockJWT(user);
     localStorage.setItem(TOKEN_KEY, token);
     return { user, token };
   },
@@ -79,10 +101,3 @@ export const authService = {
 
   getToken: () => localStorage.getItem(TOKEN_KEY)
 };
-
-function generateMockJWT(user: User): string {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const payload = btoa(JSON.stringify({ ...user, exp: Date.now() + 3600000 }));
-  const signature = btoa('mock-signature');
-  return `${header}.${payload}.${signature}`;
-}
