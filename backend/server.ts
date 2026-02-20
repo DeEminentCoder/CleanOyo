@@ -328,7 +328,8 @@ app.post('/api/ai/optimize-route', authenticate, async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: 'Failed to optimize route.' });
     }
-});```
+});
+
 // --- Server Listener (for local development) ---
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
@@ -337,4 +338,3 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export default app;
-```
