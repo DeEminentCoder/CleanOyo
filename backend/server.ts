@@ -133,7 +133,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     const { email, password, role } = req.body;
     const user = await UserModel.findOne({ email });
     if (!user) return res.status(404).json({ message: 'Account not found' });
-    // if (!user.isVerified) return res.status(401).json({ message: 'Please verify your email before logging in.' });
+    if (!user.isVerified) return res.status(401).json({ message: 'ACCOUNT NOT VERIFIED. Please check your email for a verification link.' });
     if (user.role !== role) return res.status(403).json({ message: 'Role mismatch' });
 
     const valid = await bcrypt.compare(password || 'password123', user.passwordHash);

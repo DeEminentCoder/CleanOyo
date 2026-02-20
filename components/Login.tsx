@@ -54,6 +54,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
       await onRegister({ name, email, phone, role: selectedRole, location, password });
     } catch (err: any) {
       setError(err.message || "Registration failed.");
+    } finally {
       setIsLoading(false);
     }
   };
