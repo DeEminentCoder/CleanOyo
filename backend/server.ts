@@ -328,14 +328,13 @@ app.post('/api/ai/optimize-route', authenticate, async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: 'Failed to optimize route.' });
     }
-});
-
-// Start Server
-if (import.meta.url === `file://${process.argv[1]}`) {
+});```
+// --- Server Listener (for local development) ---
+if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
-    console.log(`🚀 Waste Up Backend running on port ${PORT}`);
-    console.log(`📧 System notifications configured for: ${SYSTEM_EMAIL}`);
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
   });
 }
 
 export default app;
+```
