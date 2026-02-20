@@ -32,7 +32,7 @@ export const authService = {
   },
 
   register: async (details: { name: string; email: string; phone: string; role: UserRole; location?: string; password?: string }): Promise<{ user: User; token: string }> => {
-    const response = await fetch('/auth/register', {
+    const response = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(details),

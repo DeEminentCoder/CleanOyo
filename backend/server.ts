@@ -128,7 +128,7 @@ app.get('/api/users/verify', async (req: Request, res: Response) => {
 });
 
 // 3. Auth: Login
-app.post('/auth/login', async (req: Request, res: Response) => {
+app.post('/api/auth/login', async (req: Request, res: Response) => {
   try {
     const { email, password, role } = req.body;
     const user = await UserModel.findOne({ email });
@@ -238,7 +238,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // --- AI Service Proxy ---
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 
-app.post('/api/ai/waste-tips', authenticate, async (req, res) => {
+app.post('/api/ai/waste-tips', authenticate, async (req: Request, res: Response) => {
     try {
         const { wasteType } = req.body;
         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
@@ -313,11 +313,18 @@ app.post('/api/ai/optimize-route', authenticate, async (req, res) => {
         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
         const prompt = `Suggest an efficient waste collection route for the following locations in Ibadan, Nigeria: ${locations.map((l: any, i: number) => `${i}: ${l}`).join(', ')}. 
       Consider traffic patterns in areas like Challenge, Dugbe, and Iwo Road. 
-      Return the optimized order by their original index.`;
+      Return the optimized order as a JSON array of the original indices. For example: [2, 0, 1].`;
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
-        res.json(JSON.parse(text));
+        try {
+            // AI might wrap the response in markdown, so we clean it up.
+            const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            res.json(JSON.parse(cleanedText));
+        } catch (parseError) {
+            console.error("AI response parsing error:", parseError);
+            res.status(500).json({ message: 'Failed to parse optimized route from AI response.', raw_response: text });
+        }
     } catch (error) {
         res.status(500).json({ message: 'Failed to optimize route.' });
     }
