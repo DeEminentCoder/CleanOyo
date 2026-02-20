@@ -17,6 +17,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
   const [error, setError] = useState<string | null>(null);
   const [isResetSent, setIsResetSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
   // Form Fields
   const [email, setEmail] = useState('');
