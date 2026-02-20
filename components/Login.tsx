@@ -118,6 +118,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
           </div>
         )}
 
+        {registrationSuccess && (
+          <div className="p-3 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl text-[10px] font-bold mb-4 border border-green-100 dark:border-green-900/30">
+            ✅ Registration successful! Please log in.
+          </div>
+        )}
+
         {/* LOGIN VIEW */}
         {view === 'login' && (
           <form onSubmit={handleLoginSubmit} className="space-y-3">
