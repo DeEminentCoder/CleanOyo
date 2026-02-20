@@ -33,7 +33,6 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeNotification, setActiveNotification] = useState<Notification | null>(null);
-  const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [notificationsHistory, setNotificationsHistory] = useState<NotificationRecord[]>([]);
   const [requests, setRequests] = useState<PickupRequest[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
