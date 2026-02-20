@@ -17,7 +17,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
   const [error, setError] = useState<string | null>(null);
   const [isResetSent, setIsResetSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
   // Form Fields
   const [email, setEmail] = useState('');
@@ -79,7 +78,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
         {/* Brand Header */}
         <div className="text-center mb-6">
           <div className="w-10 h-10 bg-emerald-600 rounded-xl shadow-lg shadow-emerald-200 dark:shadow-none mx-auto flex items-center justify-center text-xl mb-3">🌱</div>
-          <h1 className="text-lg font-bold text-slate-900 dark:text-white">Waste Up Oyo</h1>
+          <h1 className="text-lg font-bold text-slate-900 dark:text-white">Waste Up Ibadan</h1>
           <p className="text-slate-400 text-[10px] mt-0.5 uppercase tracking-widest font-black">Clean Oyo Initiative</p>
         </div>
 
@@ -116,12 +115,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onRegister, onForgotPassw
         {isResetSent && (
           <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl text-[10px] font-bold mb-4 border border-emerald-100 dark:border-emerald-900/30">
             ✅ Reset instructions sent to your email.
-          </div>
-        )}
-
-        {registrationSuccess && (
-          <div className="p-3 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl text-[10px] font-bold mb-4 border border-green-100 dark:border-green-900/30">
-            ✅ Registration successful! Please log in.
           </div>
         )}
 
